@@ -18,7 +18,7 @@
  * Integration auch ganz ohne diese Karten.
  */
 
-const CARD_VERSION = "0.1.0";
+const CARD_VERSION = "0.2.0";
 
 console.info(
   `%c ARRSTACK-CARDS %c v${CARD_VERSION} `,
@@ -56,7 +56,37 @@ const ARR_ICON_PATHS = {
   refresh: '<path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/>',
   inbox: '<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>',
   pause: '<rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>',
+  listPlus: '<path d="M11 12H3"/><path d="M16 6H3"/><path d="M16 18H3"/><path d="M18 9v6"/><path d="M21 12h-6"/>',
 };
+
+/** Wo die echten Dienst-Logos herkommen.
+ *
+ * `brands.home-assistant.io` ist Home Assistants eigene Sammlung — dieselbe,
+ * aus der das Frontend die Zeichen aller Integrationen holt. Die Logos werden
+ * deshalb **verwiesen, nicht mitgeliefert**: es sind fremde Marken.
+ * Lädt das Bild nicht (kein Netz), verschwindet es rückstandslos.
+ */
+const BRAND_BASE = "https://brands.home-assistant.io/_/";
+
+/** Zeichen eines Dienstes: das echte Logo, sonst ein eigenes Strichsymbol.
+ *
+ * **Für Jellyseerr gibt es bei Home Assistant kein Markenbild.** Die Adresse
+ * antwortet mit HTTP 200 und liefert ein Bild mit der Aufschrift „icon not
+ * available" — nachgemessen am 24.08.2026, Pixel für Pixel dasselbe wie für
+ * einen erfundenen Namen. Deshalb schickt die Integration für Seerr gar keine
+ * Kennung, und hier steht dann ein eigenes Zeichen.
+ */
+function serviceSymbol(brand, fallback = "inbox", size = 22) {
+  return brand ? serviceLogo(brand, size) : arrIcon(fallback, size);
+}
+
+/** Das Logo eines Dienstes als `<img>`; ohne Kennung nichts. */
+function serviceLogo(brand, size = 22) {
+  if (!brand) return "";
+  return `<img class="logo" src="${BRAND_BASE}${encodeURIComponent(brand)}/icon.png"
+    alt="" loading="lazy" style="width: ${size}px; height: ${size}px"
+    onerror="this.remove()">`;
+}
 
 /** Ein Symbol als SVG-Zeichenkette. */
 function arrIcon(name, size = 18) {
@@ -88,8 +118,11 @@ const ARRSTACK_STYLES = `
     --arr-font-sm: 0.8125rem;
     --arr-font-md: 0.9375rem;
     --arr-font-lg: 1.125rem;
-    --arr-poster-w: 40px;
-    --arr-poster-h: 60px;
+    --arr-poster-w: 44px;
+    --arr-poster-h: 66px;
+    --arr-thumb: 36px;
+    --arr-bar: 6px;
+    --arr-logo: 22px;
     --arr-text: var(--primary-text-color, #212121);
     --arr-muted: var(--secondary-text-color, #727272);
     --arr-accent: var(--primary-color, #03a9f4);
@@ -105,25 +138,42 @@ const ARRSTACK_STYLES = `
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: var(--arr-space-2);
+    gap: var(--arr-space-3);
     margin-bottom: var(--arr-space-4);
+  }
+  .head-title {
+    display: flex;
+    align-items: center;
+    gap: var(--arr-space-2);
+    min-width: 0;
   }
   .title {
     font-size: var(--arr-font-lg);
     font-weight: 600;
     color: var(--arr-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
-  .head-meta { font-size: var(--arr-font-sm); color: var(--arr-muted); }
+  .head-meta {
+    font-size: var(--arr-font-sm);
+    color: var(--arr-muted);
+    white-space: nowrap;
+  }
+  /* Das echte Logo des Dienstes — es sagt auf einen Blick, ob die Karte auf
+     Radarr, Sonarr, SABnzbd oder Jellyseerr schaut. */
+  .logo { flex: none; border-radius: var(--arr-radius-1); object-fit: contain; }
+  .head-title .icon { flex: none; color: var(--arr-muted); }
 
-  /* Trennung über Abstand und Fläche, nicht über Rahmen. */
-  .rows { display: flex; flex-direction: column; gap: var(--arr-space-2); }
+  /* Trennung zuerst über Abstand: Zeilen liegen frei, das Vorschaubild gibt
+     den Takt. Eine graue Fläche je Zeile ergab eine Leiter aus Balken — der
+     häufigste Grund, warum solche Karten gebastelt aussehen. */
+  .rows { display: flex; flex-direction: column; gap: var(--arr-space-3); }
   .row {
     display: flex;
     align-items: center;
     gap: var(--arr-space-3);
-    padding: var(--arr-space-2);
     border-radius: var(--arr-radius-1);
-    background: var(--arr-surface);
   }
   .row-main { flex: 1; min-width: 0; }
   /* Lange Titel brechen auf zwei Zeilen um, statt abgeschnitten zu werden —
@@ -147,11 +197,19 @@ const ARRSTACK_STYLES = `
     margin-top: var(--arr-space-1);
   }
   .row-side {
-    font-size: var(--arr-font-sm);
-    color: var(--arr-muted);
-    text-align: right;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: var(--arr-space-1);
+    flex: none;
     white-space: nowrap;
   }
+  .row-side .lead {
+    font-size: var(--arr-font-md);
+    color: var(--arr-text);
+    font-variant-numeric: tabular-nums;
+  }
+  .row-side .sub { font-size: var(--arr-font-sm); color: var(--arr-muted); }
 
   .poster {
     width: var(--arr-poster-w);
@@ -167,15 +225,37 @@ const ARRSTACK_STYLES = `
     justify-content: center;
     color: var(--arr-muted);
   }
+  /* Fehlt ein Poster, steht das Dienst-Logo gedämpft an seiner Stelle —
+     eine leere graue Kachel sagt nichts. */
+  .poster-fallback .logo { width: 60%; height: auto; opacity: 0.45; }
+
+  .thumb {
+    width: var(--arr-thumb);
+    height: var(--arr-thumb);
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--arr-radius-1);
+    background: var(--arr-surface);
+    color: var(--arr-muted);
+  }
+  .thumb.warn { color: var(--warning-color, #ffa600); }
 
   .bar {
-    height: var(--arr-space-1);
-    margin-top: var(--arr-space-1);
-    border-radius: var(--arr-space-1);
-    background: var(--arr-line);
+    height: var(--arr-bar);
+    margin-top: var(--arr-space-2);
+    border-radius: var(--arr-bar);
+    background: var(--arr-surface);
     overflow: hidden;
   }
-  .bar > i { display: block; height: 100%; background: var(--arr-accent); }
+  .bar > i {
+    display: block;
+    height: 100%;
+    border-radius: var(--arr-bar);
+    background: var(--arr-accent);
+    transition: width 0.4s ease;
+  }
 
   /* Genau eine gefüllte Akzentfläche je Ansicht: der primäre Knopf. */
   button {
@@ -245,7 +325,7 @@ const ARRSTACK_STYLES = `
   @container (max-width: 380px) {
     ha-card { padding: var(--arr-space-3); }
     .row { flex-wrap: wrap; }
-    .row-side, .actions { width: 100%; text-align: left; }
+    .actions { width: 100%; }
   }
 `;
 
@@ -342,6 +422,57 @@ class ArrstackCardBase extends HTMLElement {
   }
 }
 
+/** Rohe API-Wörter in deutsche.
+ *
+ * Sonarr, Radarr und SABnzbd liefern ihre Zustände englisch und technisch
+ * (`downloadClientUnavailable`). Auf einer Karte, die im Wohnzimmer hängt,
+ * hat das nichts zu suchen.
+ */
+const QUEUE_STATUS_LABELS = {
+  downloading: "lädt",
+  queued: "wartet",
+  paused: "pausiert",
+  completed: "fertig",
+  failed: "fehlgeschlagen",
+  warning: "Warnung",
+  delay: "verzögert",
+  downloadclientunavailable: "Client nicht erreichbar",
+  fallback: "Ausweichquelle",
+  // SABnzbd
+  grabbing: "wird geholt",
+  fetching: "wird geholt",
+  checking: "wird geprüft",
+  verifying: "wird geprüft",
+  repairing: "wird repariert",
+  extracting: "wird entpackt",
+  moving: "wird verschoben",
+  running: "Nachbearbeitung",
+  propagating: "wartet auf Freigabe",
+  idle: "bereit",
+};
+
+const TRACKED_STATE_LABELS = {
+  importPending: "Import steht aus",
+  importBlocked: "Import blockiert",
+  importing: "wird importiert",
+  imported: "importiert",
+  failedPending: "fehlgeschlagen",
+  failed: "fehlgeschlagen",
+  ignored: "übergangen",
+};
+
+/** Was in der Zeile als Zustand steht.
+ *
+ * Der Importzustand schlägt den Download-Status, sobald er vom Normalfall
+ * abweicht — „Import blockiert" ist die Auskunft, die zählt, nicht „fertig".
+ */
+function queueStatusText(item) {
+  const tracked = TRACKED_STATE_LABELS[item.tracked_state];
+  if (tracked) return tracked;
+  const key = String(item.status || "").toLowerCase();
+  return QUEUE_STATUS_LABELS[key] || item.status || "";
+}
+
 /** Text sicher in HTML einsetzen — Titel kommen aus fremden Quellen. */
 function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, (character) => ({
@@ -360,7 +491,13 @@ function formatBytes(bytes) {
   const units = ["B", "KB", "MB", "GB", "TB"];
   const exponent = Math.min(units.length - 1, Math.floor(Math.log(value) / Math.log(1024)));
   const scaled = value / 1024 ** exponent;
-  return `${scaled.toFixed(scaled >= 100 || exponent === 0 ? 0 : 1)} ${units[exponent]}`;
+  const digits = scaled >= 100 || exponent === 0 ? 0 : 1;
+  // Deutsches Zahlenformat: 5,1 GB, nicht 5.1 GB.
+  const text = scaled.toLocaleString("de-DE", {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  });
+  return `${text} ${units[exponent]}`;
 }
 
 /** `00:12:30` → `12 Min.`; unbekannte Formate bleiben, wie sie sind. */
@@ -387,9 +524,12 @@ function formatSince(value) {
 }
 
 /** Poster oder ersatzweise ein Symbol — nie ein kaputtes Bild. */
-function posterMarkup(url, icon = "film") {
+function posterMarkup(url, brand = null, icon = "film") {
   if (!url) {
-    return `<div class="poster poster-fallback">${arrIcon(icon, 20)}</div>`;
+    // Kein Poster: das Dienst-Logo gedämpft, sonst das Strichsymbol.
+    const inner = brand ? serviceLogo(brand, 24) : arrIcon(icon, 20);
+    // `brand` ist absichtlich leer, wo es kein Markenbild gibt (Seerr).
+    return `<div class="poster poster-fallback">${inner}</div>`;
   }
   // Lädt das Bild nicht (TMDB nicht erreichbar), bleibt die Fläche stehen —
   // ein kaputtes Bildsymbol wäre lauter als die leere Kachel.
@@ -532,7 +672,10 @@ class ArrstackDownloadsCard extends ArrstackCardBase {
     this.shadowRoot.innerHTML = `<style>${ARRSTACK_STYLES}</style>
       <ha-card>
         <div class="head">
-          <span class="title">${escapeHtml(this._config.title)}</span>
+          <div class="head-title">
+            ${serviceSymbol(this._data?.brand, "download", 22)}
+            <span class="title">${escapeHtml(this._config.title)}</span>
+          </div>
           <span class="head-meta">${escapeHtml(this._headMeta())}</span>
         </div>
         ${this._body()}
@@ -574,10 +717,13 @@ class ArrstackDownloadsCard extends ArrstackCardBase {
           : 0;
     const remaining = leftBytes > 0 ? formatBytes(leftBytes) : "";
     const title = item.parent_title || item.title || "";
-    const meta = [item.episode, item.status, item.category].filter(Boolean).join(" · ");
+    const meta = [item.episode, queueStatusText(item), item.category]
+      .filter(Boolean)
+      .join(" · ");
     const poster = this._config.show_posters
-      ? posterMarkup(item.poster, "download")
+      ? posterMarkup(item.poster, this._data?.brand, "download")
       : "";
+    const rest = formatTimeleft(item.timeleft) || remaining;
     return `<div class="row">
       ${poster}
       <div class="row-main">
@@ -585,9 +731,10 @@ class ArrstackDownloadsCard extends ArrstackCardBase {
         <div class="row-meta">${escapeHtml(meta)}</div>
         <div class="bar"><i style="width: ${Math.max(0, Math.min(100, progress))}%"></i></div>
       </div>
-      <div class="row-side">${Math.round(progress)} %<br>${escapeHtml(
-        formatTimeleft(item.timeleft) || remaining
-      )}</div>
+      <div class="row-side">
+        <span class="lead">${Math.round(progress)} %</span>
+        ${rest ? `<span class="sub">${escapeHtml(rest)}</span>` : ""}
+      </div>
     </div>`;
   }
 }
@@ -628,7 +775,10 @@ class ArrstackRecentCard extends ArrstackCardBase {
     this.shadowRoot.innerHTML = `<style>${ARRSTACK_STYLES}</style>
       <ha-card>
         <div class="head">
-          <span class="title">${escapeHtml(this._config.title)}</span>
+          <div class="head-title">
+            ${serviceSymbol(this._data?.brand, "download", 22)}
+            <span class="title">${escapeHtml(this._config.title)}</span>
+          </div>
         </div>
         ${this._body()}
       </ha-card>`;
@@ -646,14 +796,16 @@ class ArrstackRecentCard extends ArrstackCardBase {
     return `<div class="rows">${items
       .map(
         (item) => `<div class="row">
-          ${posterMarkup(item.poster)}
+          ${posterMarkup(item.poster, this._data?.brand)}
           <div class="row-main">
             <div class="row-title">${escapeHtml(item.title || "")}</div>
             <div class="row-meta">${escapeHtml(
               [item.subtitle, item.quality].filter(Boolean).join(" · ")
             )}</div>
           </div>
-          <div class="row-side">${escapeHtml(formatSince(item.added))}</div>
+          <div class="row-side">
+            <span class="sub">${escapeHtml(formatSince(item.added))}</span>
+          </div>
         </div>`
       )
       .join("")}</div>`;
@@ -709,7 +861,10 @@ class ArrstackFixCard extends ArrstackCardBase {
     this.shadowRoot.innerHTML = `<style>${ARRSTACK_STYLES}</style>
       <ha-card>
         <div class="head">
-          <span class="title">${escapeHtml(this._config.title)}</span>
+          <div class="head-title">
+            ${serviceSymbol(this._data?.brand, "download", 22)}
+            <span class="title">${escapeHtml(this._config.title)}</span>
+          </div>
           <span class="head-meta">${items.length ? `${items.length} offen` : ""}</span>
         </div>
         ${this._message ? `<div class="notice">${escapeHtml(this._message)}</div>` : ""}
@@ -734,6 +889,7 @@ class ArrstackFixCard extends ArrstackCardBase {
     const reason = item.messages?.[0] || item.tracked_state || "";
     return `<div class="row" data-download="${escapeHtml(item.download_id || "")}"
         data-item="${escapeHtml(item.id ?? "")}" style="flex-wrap: wrap;">
+      <div class="thumb warn">${arrIcon("alert", 20)}</div>
       <div class="row-main">
         <div class="row-title">${escapeHtml(item.parent_title || item.title)}</div>
         <div class="row-meta">${escapeHtml(reason)}</div>
@@ -942,7 +1098,10 @@ class ArrstackSeerCard extends ArrstackCardBase {
       </style>
       <ha-card>
         <div class="head">
-          <span class="title">${escapeHtml(this._config.title)}</span>
+          <div class="head-title">
+            ${serviceSymbol(null, "listPlus", 22)}
+            <span class="title">${escapeHtml(this._config.title)}</span>
+          </div>
         </div>
         <div class="search">
           <input type="search" placeholder="Serie oder Film suchen"

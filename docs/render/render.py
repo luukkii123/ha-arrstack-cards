@@ -131,12 +131,13 @@ PAGE = """<!doctype html>
       window.__wsCalls.push(msg);
       switch (msg.type) {{
         case 'arrstack/queue':
-          return Promise.resolve({{ service: 'sonarr', items: window.__emptyQueue ? [] : QUEUE,
+          return Promise.resolve({{ service: 'sonarr', brand: 'sonarr',
+                                   items: window.__emptyQueue ? [] : QUEUE,
                                    total: window.__emptyQueue ? 0 : QUEUE.length, speed: 5.4e6 }});
         case 'arrstack/recent':
-          return Promise.resolve({{ service: 'sonarr', items: RECENT }});
+          return Promise.resolve({{ service: 'sonarr', brand: 'sonarr', items: RECENT }});
         case 'arrstack/import_problems':
-          return Promise.resolve({{ service: 'sonarr', items: PROBLEMS }});
+          return Promise.resolve({{ service: 'sonarr', brand: 'sonarr', items: PROBLEMS }});
         case 'arrstack/manual_import':
           return Promise.resolve({{
             service: 'sonarr', can_auto_import: false,
@@ -150,7 +151,9 @@ PAGE = """<!doctype html>
         case 'arrstack/tv_seasons':
           return Promise.resolve(SEASONS);
         case 'arrstack/instances':
-          return Promise.resolve({{ instances: [] }});
+          return Promise.resolve({{ instances: [
+            {{ entry_id: 'e1', title: 'Sonarr (beispiel)', service: 'sonarr', brand: 'sonarr' }},
+          ] }});
         default:
           return Promise.reject({{ code: 'unknown_command', message: msg.type }});
       }}
@@ -304,6 +307,9 @@ try:
                       .filter(el => el.scrollWidth > el.clientWidth + 1).length,
                     emojiInMarkup: /[\\u{1F300}-\\u{1FAFF}\\u{2700}-\\u{27BF}]/u.test(sr.innerHTML),
                     svgIcons: sr.querySelectorAll('svg.icon').length,
+                    logos: sr.querySelectorAll('img.logo').length,
+                    logosLoaded: [...sr.querySelectorAll('img.logo')]
+                      .filter(el => el.complete && el.naturalWidth > 0).length,
                   };
                 }
                 out.wsCalls = [...new Set(window.__wsCalls.map(c => c.type))];

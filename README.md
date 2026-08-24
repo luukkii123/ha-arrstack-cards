@@ -81,6 +81,25 @@ Auf schmalen Karten rutschen die Nebenspalten unter den Inhalt, statt Text
 abzuschneiden. Farben kommen aus den Home-Assistant-Variablen, das Thema des
 Nutzers gilt also auch hier.
 
+## Das Zeichen des Dienstes
+
+Jede Karte zeigt im Kopf das Logo des Dienstes, auf den sie schaut — Sonarr,
+Radarr oder SABnzbd. Fehlt einem Eintrag das Poster, steht das Logo gedämpft
+an seiner Stelle statt einer leeren grauen Kachel.
+
+Die Logos werden von **`brands.home-assistant.io`** geladen, Home Assistants
+eigener Sammlung: dieselbe Quelle, aus der das Frontend die Zeichen aller
+Integrationen holt. Sie liegen also **nicht** in diesem Repo — es sind fremde
+Marken. Ohne Internet verschwindet das Bild rückstandslos, die Karte bleibt
+vollständig bedienbar.
+
+**Für Jellyseerr gibt es dort kein Zeichen.** Die Adresse antwortet trotzdem
+mit HTTP 200 und liefert ein Bild mit der Aufschrift „icon not available" —
+am 24.08.2026 nachgemessen: Pixel für Pixel dasselbe wie für einen frei
+erfundenen Namen. Ein Statuscode ist hier also kein Beleg. Die Anfrage-Karte
+trägt deshalb ein eigenes Strichsymbol; das Zeichen von Overseerr zu borgen
+wäre das falsche Produkt.
+
 ## Kein Build-Schritt
 
 `dist/arrstack-cards.js` ist Quelltext und Auslieferung in einem: reines
@@ -105,9 +124,10 @@ docker run --rm -v "$PWD:/repo" \
 
 Der Lauf protokolliert jede Netzanfrage nach `report.json` und misst nach, was
 sich am Bild sonst nur behaupten ließe: gefüllte Akzentflächen, abgeschnittener
-Text, Emoji im Markup, Seitenbreite. Bei 1280 px hell und 390 px dunkel waren
-alle Fehlerlisten leer, es gab **zwei** Netzanfragen (Seite und JS-Datei) und
-keinen Versuch, aus einem Unterordner nachzuladen.
+Text, Emoji im Markup, Seitenbreite und ob die Dienst-Logos **tatsächlich
+geladen** wurden (`naturalWidth > 0`). Bei 1280 px hell und 390 px dunkel waren
+alle Fehlerlisten leer, kein Versuch, aus einem Unterordner nachzuladen, und
+die einzige Anfrage nach außen ging an `brands.home-assistant.io`.
 
 **Was noch aussteht:** ein Lauf in einem echten Home Assistant. Geprüft ist die
 Darstellung gegen erfundene Daten, nicht das Zusammenspiel mit einem laufenden
