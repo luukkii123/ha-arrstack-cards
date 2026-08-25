@@ -97,8 +97,13 @@ vollständig bedienbar.
 mit HTTP 200 und liefert ein Bild mit der Aufschrift „icon not available" —
 am 24.08.2026 nachgemessen: Pixel für Pixel dasselbe wie für einen frei
 erfundenen Namen. Ein Statuscode ist hier also kein Beleg. Die Anfrage-Karte
-trägt deshalb ein eigenes Strichsymbol; das Zeichen von Overseerr zu borgen
-wäre das falsche Produkt.
+trägt deshalb eine selbst gezeichnete **Qualle** in der Akzentfarbe — erkennbar
+und zur Herkunft von Jellyseerr passend, ohne eine fremde Marke nachzuzeichnen.
+Das Zeichen von Overseerr zu borgen wäre das falsche Produkt.
+
+Ein blasses graues Strichsymbol reichte dafür übrigens nicht: neben drei
+farbigen Logos liest es sich schlicht als fehlend. Eigene Zeichen stehen
+deshalb in der Akzentfarbe.
 
 ## Kein Build-Schritt
 

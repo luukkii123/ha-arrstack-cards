@@ -18,7 +18,7 @@
  * Integration auch ganz ohne diese Karten.
  */
 
-const CARD_VERSION = "0.2.0";
+const CARD_VERSION = "0.2.1";
 
 console.info(
   `%c ARRSTACK-CARDS %c v${CARD_VERSION} `,
@@ -57,6 +57,11 @@ const ARR_ICON_PATHS = {
   inbox: '<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>',
   pause: '<rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>',
   listPlus: '<path d="M11 12H3"/><path d="M16 6H3"/><path d="M16 18H3"/><path d="M18 9v6"/><path d="M21 12h-6"/>',
+  jellyfish:
+    '<path d="M4 12a8 8 0 0 1 16 0"/><path d="M4 12h16"/>' +
+    '<path d="M7.5 12c0 2.5-1.5 3.5-1.5 5.5S7 20 7 20"/>' +
+    '<path d="M12 12v8"/>' +
+    '<path d="M16.5 12c0 2.5 1.5 3.5 1.5 5.5S17 20 17 20"/>',
 };
 
 /** Wo die echten Dienst-Logos herkommen.
@@ -163,7 +168,7 @@ const ARRSTACK_STYLES = `
   /* Das echte Logo des Dienstes — es sagt auf einen Blick, ob die Karte auf
      Radarr, Sonarr, SABnzbd oder Jellyseerr schaut. */
   .logo { flex: none; border-radius: var(--arr-radius-1); object-fit: contain; }
-  .head-title .icon { flex: none; color: var(--arr-muted); }
+  .head-title .icon { flex: none; color: var(--arr-accent); }
 
   /* Trennung zuerst über Abstand: Zeilen liegen frei, das Vorschaubild gibt
      den Takt. Eine graue Fläche je Zeile ergab eine Leiter aus Balken — der
@@ -1099,7 +1104,7 @@ class ArrstackSeerCard extends ArrstackCardBase {
       <ha-card>
         <div class="head">
           <div class="head-title">
-            ${serviceSymbol(null, "listPlus", 22)}
+            ${serviceSymbol(null, "jellyfish", 22)}
             <span class="title">${escapeHtml(this._config.title)}</span>
           </div>
         </div>
