@@ -151,8 +151,8 @@ absichtlich zu lang: gekürzt werden muss genau dort.
 node --check dist/arrstack-cards.js
 
 docker run --rm \
-  -v "/pfad/zu/hacs/docs/render:/work" \
-  -v "/pfad/zu/hacs/ha-arrstack-cards:/cards" \
+  -v "/mnt/user/Data/Claude Projekte/hacs/docs/render:/work" \
+  -v "/mnt/user/Data/Claude Projekte/hacs/ha-arrstack-cards:/cards" \
   --entrypoint bash mcr.microsoft.com/playwright/python:v1.62.0-noble \
   -c 'pip install --quiet --break-system-packages playwright==1.62.0 >/dev/null; \
       python3 /cards/docs/render/render.py /cards/dist/arrstack-cards.js \
