@@ -38,11 +38,16 @@ eingerichtet."
 
 ## Einstellungen
 
+Jedes Feld steht im Karteneditor, jedes hat dort eine Beschriftung **und**
+einen erklärenden Satz — deutsch oder englisch, je nach der Sprache in Home
+Assistant. YAML zu schreiben ist nirgends nötig.
+
 | Feld | Bedeutung | Standard |
 | --- | --- | --- |
-| `title` | Überschrift der Karte | je Karte verschieden |
+| `title` | Überschrift der Karte | Vorgabetitel in der Sprache des Nutzers |
 | `entry_id` | welche Instanz. Leer lassen, wenn es nur eine passende gibt | leer |
-| `refresh_seconds` | wie oft neu geladen wird, `0` = nie | 15 (Anfragen: 0) |
+| `service` | Diensttyp, wenn keine Instanz gewählt ist | leer |
+| `refresh_seconds` | wie oft neu geladen wird, `0` = nie | 15 · Zuletzt 120 · Reparatur 60 · Anfragen 0 |
 | `max_items` | wie viele Zeilen höchstens | 8–10 |
 | `show_posters` | Poster in der Download-Karte | `true` |
 
@@ -57,29 +62,46 @@ max_items: 5
 
 ## Reparatur statt Ratespiel
 
-![Die Reparatur-Karte mit gesperrtem Auto-Import und Begründung](docs/preview-fix.png)
+![Der Dialog „Dateien prüfen" mit gesperrtem Import und Begründung](docs/preview-fix.png)
 
-Der Knopf *Importieren* ist nur aktiv, wenn die Integration den Import als
-ungefährlich einstuft. Ist eine Datei keiner Serie zugeordnet oder nennt die
-App einen heiklen Grund, bleibt er gesperrt und der Grund steht darunter.
-*Entfernen* ist bewusst zurückhaltend gestaltet — Löschen ist nie die
-Hauptaktion.
+*Prüfen* öffnet einen Dialog mit den gefundenen Dateien. Der Knopf
+*Importieren* ist nur aktiv, wenn die Integration den Import als ungefährlich
+einstuft. Ist eine Datei keiner Serie zugeordnet oder nennt die App einen
+heiklen Grund, bleibt er gesperrt und der Grund steht darunter.
+
+*Löschen* nimmt den Eintrag aus der Warteschlange **und** löscht die
+heruntergeladenen Dateien im Download-Client. Weil das nicht rückgängig zu
+machen ist, kommt vorher eine Rückfrage: ein schmaler Dialog mit *Abbrechen*
+und einem roten *Löschen*.
 
 ## Anfragen mit Staffelauswahl
 
-![Suchergebnis mit Staffelauswahl; verfügbare Staffeln sind gesperrt](docs/preview-seer.png)
+![Dialog mit Staffelauswahl; verfügbare Staffeln sind gesperrt](docs/preview-seer.png)
 
-Bereits verfügbare Staffeln sind gesperrt und markiert, fehlende sind
-vorbelegt — der häufigste Wunsch ist „alles, was noch fehlt". Bei Serien geht
-die Staffelliste **immer** mit; ohne sie antwortet Jellyseerr mit einem Fehler.
+Ein Treffer öffnet einen Dialog. Bereits verfügbare Staffeln sind gesperrt und
+markiert, fehlende sind vorbelegt — der häufigste Wunsch ist „alles, was noch
+fehlt". Bei Serien geht die Staffelliste **immer** mit; ohne sie antwortet
+Jellyseerr mit einem Fehler.
+
+## Dialoge, die sich schließen lassen
+
+Jeder Dialog dieser Karten schließt auf **Escape**, auf einen Klick **neben**
+den Dialog und auf die **Zurück-Taste** des Browsers beziehungsweise die
+Zurück-Geste am Handy — ohne dabei das Dashboard zu verlassen. Dafür legt er
+beim Öffnen einen eigenen Verlaufseintrag an und nimmt ihn beim Schließen
+wieder mit; sein Schließ-Knopf hinterlässt also keinen verwaisten Eintrag.
+Unter 450 px Breite wird der Dialog Vollbild, die Aktionsknöpfe bleiben unten
+stehen.
 
 ## Mobil und im dunklen Thema
 
 ![Alle vier Karten auf 390 px Breite im dunklen Thema](docs/preview-mobil-dunkel.png)
 
-Auf schmalen Karten rutschen die Nebenspalten unter den Inhalt, statt Text
-abzuschneiden. Farben kommen aus den Home-Assistant-Variablen, das Thema des
-Nutzers gilt also auch hier.
+Auf schmalen Karten rutschen die Nebenspalten unter den Inhalt. Lange Titel —
+Veröffentlichungsnamen aus dem Usenet sind regelmäßig länger als jede Karte
+breit ist — werden einzeilig gekürzt, statt die Karte zu sprengen. Farben,
+Abstände und Schriftgrößen kommen aus den Home-Assistant-Variablen, das Thema
+des Nutzers gilt also auch hier.
 
 ## Das Zeichen des Dienstes
 
@@ -114,29 +136,50 @@ alles darunter erreicht den Browser nie.
 
 ## Geprüft
 
+**Stand 09.09.2026, `CARD_VERSION` 0.2.1** — gemessen gegen die vier
+verbindlichen UI-Regeln: Text bleibt in seiner Karte · Popups schließen mit
+Escape, Scrim und Zurück · alles im Editor einrichtbar, jedes Feld erklärt,
+zweisprachig · Home-Assistant-Design.
+
 Die Bilder oben stammen aus `docs/render/render.py`: Die ausgelieferte Datei
 wird in echtem Chromium gerendert, `ha-card`/`ha-icon`/`ha-form` sind
 Attrappen, und `callWS` beantwortet die arrstack-Kommandos mit erfundenen
-Daten — kein Media-Stack, kein Schlüssel nötig.
+Daten — kein Media-Stack, kein Schlüssel nötig. Die Attrappen-Titel sind
+absichtlich zu lang: gekürzt werden muss genau dort.
 
 ```bash
-docker run --rm -v "$PWD:/repo" \
+node --check dist/arrstack-cards.js
+
+docker run --rm \
+  -v "/pfad/zu/hacs/docs/render:/work" \
+  -v "/pfad/zu/hacs/ha-arrstack-cards:/cards" \
   --entrypoint bash mcr.microsoft.com/playwright/python:v1.62.0-noble \
   -c 'pip install --quiet --break-system-packages playwright==1.62.0 >/dev/null; \
-      python3 /repo/docs/render/render.py /repo/dist/arrstack-cards.js \
-              /repo/docs/render/ergebnis 1280 light'
+      python3 /cards/docs/render/render.py /cards/dist/arrstack-cards.js \
+              /cards/docs/render/ergebnis'
 ```
 
-Der Lauf protokolliert jede Netzanfrage nach `report.json` und misst nach, was
-sich am Bild sonst nur behaupten ließe: gefüllte Akzentflächen, abgeschnittener
-Text, Emoji im Markup, Seitenbreite und ob die Dienst-Logos **tatsächlich
-geladen** wurden (`naturalWidth > 0`). Bei 1280 px hell und 390 px dunkel waren
-alle Fehlerlisten leer, kein Versuch, aus einem Unterordner nachzuladen, und
-die einzige Anfrage nach außen ging an `brands.home-assistant.io`.
+**Messumfang und Ergebnis** (`docs/render/ergebnis/report.json`, Exit 0):
+
+| Was | Umfang | Ergebnis |
+| --- | --- | --- |
+| Regel 1, alle vier Karten | 320 / 480 / 960 px × hell / dunkel, je einmal mit und ohne die `--ha-space-*`-Variablen — 420 Textelemente | 0 Überlauf, 0 außerhalb der Karte, 0 Überlappung, 0 „kein Urteil"; 48 gewollte Kürzungen |
+| Regel 1 im Dialog | dieselben sechs Fassungen, 54 Textelemente | 0 Verstöße, 0 „kein Urteil" |
+| Regel 2, drei Dialoge (Staffelauswahl, Dateien prüfen, Löschen bestätigen) | Escape · `history.back()` · Schließ-Knopf · `elementFromPoint` | 12 von 12 bestanden |
+| Regel 2, zusätzlich | Klick neben den Dialog, Verlaufslänge, Breite 560/320 px, Vollbild unter 450 px, `z-index` | schließt, keine verwaisten Einträge, 560 / 320 px, Vollbild 320×1200, `z-index: 100000` |
+| Regel 3 am echten Editor | jedes Schemafeld jeder Karte, deutsch und englisch | kein Feld ohne Beschriftung, keines ohne Helper, beide Sprachen verschieden |
+| Regel 4 | `scripts/ui-regeln-pruefen.py --repo ha-arrstack-cards` | 0 Verstöße |
+| Netz | jede Anfrage protokolliert | 3 Anfragen, 0 Fehlantworten, 0 Konsolenfehler, 0 Seitenfehler, kein Nachladen aus einem Unterordner |
+
+Die Messung selbst wird gegengeprüft: Zwei Sonden werden in die Karte
+geschoben — eine fehlerhafte, die gemeldet werden **muss**, und eine korrekt
+gekürzte, die **nicht** gemeldet werden darf. Beide Gegenproben schlugen wie
+verlangt an. Ohne das wäre ein Lauf mit null Verstößen wertlos.
 
 **Was noch aussteht:** ein Lauf in einem echten Home Assistant. Geprüft ist die
 Darstellung gegen erfundene Daten, nicht das Zusammenspiel mit einem laufenden
-Radarr.
+Radarr — die Integration `arrstack` ist selbst noch nicht am echten System
+getestet.
 
 ## Lizenz
 
