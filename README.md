@@ -163,8 +163,8 @@ docker run --rm \
 
 | Was | Umfang | Ergebnis |
 | --- | --- | --- |
-| Regel 1, alle vier Karten | 320 / 480 / 960 px × hell / dunkel, je einmal mit und ohne die `--ha-space-*`-Variablen — 420 Textelemente | 0 Überlauf, 0 außerhalb der Karte, 0 Überlappung, 0 „kein Urteil"; 48 gewollte Kürzungen |
-| Regel 1 im Dialog | dieselben sechs Fassungen, 54 Textelemente | 0 Verstöße, 0 „kein Urteil" |
+| Regel 1, alle vier Karten | jede im vollen Zustand (die Anfrage-Karte mit Treffern, nicht leer): 320 / 480 / 960 px × hell / dunkel, je einmal mit und ohne die `--ha-space-*`-Variablen — 528 Textelemente | 0 Überlauf, 0 außerhalb der Karte, 0 Überlappung, 0 „kein Urteil"; 72 gewollte Kürzungen |
+| Regel 1 in jedem der drei Dialoge | dieselben sechs Fassungen je Dialog, 114 Textelemente | 0 Verstöße, 0 „kein Urteil" |
 | Regel 2, drei Dialoge (Staffelauswahl, Dateien prüfen, Löschen bestätigen) | Escape · `history.back()` · Schließ-Knopf · `elementFromPoint` | 12 von 12 bestanden |
 | Regel 2, zusätzlich | Klick neben den Dialog, Verlaufslänge, Breite 560/320 px, Vollbild unter 450 px, `z-index` | schließt, keine verwaisten Einträge, 560 / 320 px, Vollbild 320×1200, `z-index: 100000` |
 | Regel 3 am echten Editor | jedes Schemafeld jeder Karte, deutsch und englisch | kein Feld ohne Beschriftung, keines ohne Helper, beide Sprachen verschieden |

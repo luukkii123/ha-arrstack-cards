@@ -10,7 +10,9 @@ das Dashboard zu verlassen.
 
 Gemessen wird gegen `hacs/docs/ui-regeln.md`:
 
-* **Regel 1** (`regeln.messe_text`) an allen vier Karten, bei 320, 480 und
+* **Regel 1** (`regeln.messe_text`) an allen vier Karten — jede vorher in
+  ihren vollen Zustand gebracht, die Seerr-Karte also mit Treffern statt mit
+  ihrem Leerzustand —, bei 320, 480 und
   960 px, im hellen und im dunklen Thema — und das doppelt: einmal mit den
   HA-Abstandsvariablen (`--ha-space-*`), einmal ohne, also auf dem
   Rückfallpfad. Beide Fassungen kommen bei einem Nutzer vor, je nach Theme.
@@ -18,9 +20,11 @@ Gemessen wird gegen `hacs/docs/ui-regeln.md`:
   der Seerr-Karte, dem Prüfergebnis der Reparatur-Karte und der Rückfrage vor
   dem Löschen. Alle drei sind `arrstack-dialog`; die Messung öffnet sie über
   denselben Weg, den ein Nutzer nimmt.
-* **Regel 1 im Dialog**: derselbe Texttest mit `arrstack-dialog` als Bezug.
-  Das Element liegt am `document.body`, nicht in der Karte — sein Rechteck ist
-  das Ansichtsfenster.
+* **Regel 1 in jedem der drei Dialoge**: derselbe Texttest mit
+  `arrstack-dialog` als Bezug, ebenfalls bei allen drei Breiten in beiden
+  Themen. Das Element liegt am `document.body`, nicht in der Karte — sein
+  Rechteck ist das Ansichtsfenster. `messe_popup` misst nur Regel 2; ein
+  geöffnetes Popup bliebe für Regel 1 sonst ungemessen.
 * **Gegenprobe** (`regeln.selbsttest`): schlägt die Messung überhaupt an, und
   meldet sie eine gewollte Kürzung *nicht* fälschlich als Verstoß?
 
@@ -296,7 +300,7 @@ requests, responses, failures, console, errors = [], [], [], [], []
 probe = {}
 ui_ohne_tokens = ui_mit_tokens = selbst = None
 popups = {}
-ui_dialog = None
+ui_dialog = {}
 eigen = {}
 
 
@@ -364,6 +368,20 @@ try:
         }""")
         alles_zu(page)
 
+        # Jede Karte in ihren vollen Zustand bringen, sonst misst der Lauf
+        # Leerflächen: die Seerr-Karte zeigte sonst nur „Titel eintippen und
+        # suchen" — die langen Treffertitel und die Statuschips, also genau
+        # das, was kürzen muss, wären nie unter das Messgerät gekommen.
+        page.evaluate("""async () => {
+            await window.__cards.seer._search('beispiel');
+            const t = window.__cards.fix._t();
+            window.__cards.fix._message = t.gesperrt.replace('{grund}',
+              'unknownSeries; Keine Serie und kein Film zugeordnet, und dieser '
+              + 'Hinweis ist absichtlich laenger als jede Kartenbreite');
+            window.__cards.fix._render();
+        }""")
+        page.wait_for_timeout(400)
+
         def messe_alle(p):
             return {name: regeln.messe_text(p, tag) for name, tag in KARTEN.items()}
 
@@ -427,21 +445,45 @@ try:
         # das Ansichtsfenster. Unter 450 px wird der Dialog Vollbild.
         alles_zu(page)
 
-        def dialog_auf(p):
-            if not dialog_offen(p):
-                p.evaluate("""async () => {
-                    const c = window.__cards.seer;
-                    await c._search('beispiel');
-                    const row = c.shadowRoot.querySelector('.result');
-                    if (row) row.click();
-                }""")
-                p.wait_for_timeout(400)
+        # Je Dialog eine Öffnerfunktion; `vor_messung` sorgt dafür, dass er
+        # nach jeder Größenänderung wieder offen ist.
+        OEFFNER = {
+            "seer_staffeln": """async () => {
+                const c = window.__cards.seer;
+                if (!c._results) await c._search('beispiel');
+                const row = c.shadowRoot.querySelector('.result');
+                if (row) row.click();
+            }""",
+            "fix_pruefen": """async () => {
+                const b = window.__cards.fix.shadowRoot.querySelector('.act-check');
+                if (b) b.click();
+            }""",
+            "fix_loeschen": """async () => {
+                const b = window.__cards.fix.shadowRoot.querySelector('.act-delete');
+                if (b) b.click();
+            }""",
+        }
 
+        def macher(js):
+            def auf(p):
+                if not dialog_offen(p):
+                    p.evaluate(js)
+                    p.wait_for_timeout(500)
+            return auf
+
+        dialog_auf = macher(OEFFNER["seer_staffeln"])
+
+        ui_dialog = {}
+        for name, js in OEFFNER.items():
+            alles_zu(page)
+            auf = macher(js)
+            auf(page)
+            ui_dialog[name] = regeln.lauf_breiten(
+                page,
+                messung=lambda p: regeln.messe_text(p, "arrstack-dialog"),
+                vor_messung=auf)
+            alles_zu(page)
         dialog_auf(page)
-        ui_dialog = regeln.lauf_breiten(
-            page,
-            messung=lambda p: regeln.messe_text(p, "arrstack-dialog"),
-            vor_messung=dialog_auf)
 
         # Screenshots der Dialoge — Vollbild am Handy, Blatt am Schirm.
         for breite, thema in ((320, "light"), (WIDTH, "light"), (960, "dark")):
