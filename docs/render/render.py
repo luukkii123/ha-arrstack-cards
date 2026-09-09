@@ -452,8 +452,12 @@ try:
             schliessen_knopf_selektor=".dlg-close")
 
         # ── Regel 1 im Dialog ────────────────────────────────────────────────
-        # Bezugsrechteck ist hier der Host (`:host` ist fixed inset: 0), also
-        # das Ansichtsfenster. Unter 450 px wird der Dialog Vollbild.
+        # Bezugsrechteck ist `.sheet`, das sichtbare Blatt — NICHT der Host
+        # `arrstack-dialog`. Der ist `position: fixed; inset: 0` und damit so
+        # gross wie das Fenster; gaebe man ihn als Bezug an, laege jeder Text
+        # per Definition „im Rechteck" und Pruefung 2 waere leer (siehe Kopf
+        # dieser Datei). Unter 450 px wird der Dialog Vollbild — dann fallen
+        # Blatt und Fenster zusammen, das Blatt bleibt trotzdem der Bezug.
         alles_zu(page)
 
         # Je Dialog eine Öffnerfunktion; `vor_messung` sorgt dafür, dass er
