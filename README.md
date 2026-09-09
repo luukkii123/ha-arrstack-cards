@@ -95,7 +95,7 @@ stehen.
 
 ## Mobil und im dunklen Thema
 
-![Alle vier Karten auf 390 px Breite im dunklen Thema](docs/preview-mobil-dunkel.png)
+![Alle vier Karten auf 320 px Breite im dunklen Thema](docs/preview-mobil-dunkel.png)
 
 Auf schmalen Karten rutschen die Nebenspalten unter den Inhalt. Lange Titel —
 Veröffentlichungsnamen aus dem Usenet sind regelmäßig länger als jede Karte
@@ -164,9 +164,9 @@ docker run --rm \
 | Was | Umfang | Ergebnis |
 | --- | --- | --- |
 | Regel 1, alle vier Karten | jede im vollen Zustand (die Anfrage-Karte mit Treffern, nicht leer): 320 / 480 / 960 px × hell / dunkel, je einmal mit und ohne die `--ha-space-*`-Variablen — 528 Textelemente | 0 Überlauf, 0 außerhalb der Karte, 0 Überlappung, 0 „kein Urteil"; 72 gewollte Kürzungen |
-| Regel 1 in jedem der drei Dialoge | dieselben sechs Fassungen je Dialog, 114 Textelemente | 0 Verstöße, 0 „kein Urteil" |
-| Regel 2, drei Dialoge (Staffelauswahl, Dateien prüfen, Löschen bestätigen) | Escape · `history.back()` · Schließ-Knopf · `elementFromPoint` | 12 von 12 bestanden |
-| Regel 2, zusätzlich | Klick neben den Dialog, Verlaufslänge, Breite 560/320 px, Vollbild unter 450 px, `z-index` | schließt, keine verwaisten Einträge, 560 / 320 px, Vollbild 320×1200, `z-index: 100000` |
+| Regel 1 in jedem der drei Dialoge | dieselben sechs Fassungen je Dialog, Bezugsrechteck ist das Dialogblatt selbst — 114 Textelemente | 0 Verstöße, 0 „kein Urteil" |
+| Regel 2, drei Dialoge (Staffelauswahl, Dateien prüfen, Löschen bestätigen) | Escape · `history.back()` · Schließ-Knopf · `elementFromPoint` · Klick neben den Dialog | 15 von 15 bestanden |
+| Regel 2, zusätzlich | Breite 560/320 px, Vollbild unter 450 px, `z-index` | 560 / 320 px, Vollbild 320×1200, `z-index: 100000` |
 | Regel 3 am echten Editor | jedes Schemafeld jeder Karte, deutsch und englisch | kein Feld ohne Beschriftung, keines ohne Helper, beide Sprachen verschieden |
 | Regel 4 | `scripts/ui-regeln-pruefen.py --repo ha-arrstack-cards` | 0 Verstöße |
 | Netz | jede Anfrage protokolliert | 3 Anfragen, 0 Fehlantworten, 0 Konsolenfehler, 0 Seitenfehler, kein Nachladen aus einem Unterordner |

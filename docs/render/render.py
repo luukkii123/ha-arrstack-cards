@@ -18,13 +18,19 @@ Gemessen wird gegen `hacs/docs/ui-regeln.md`:
   Rückfallpfad. Beide Fassungen kommen bei einem Nutzer vor, je nach Theme.
 * **Regel 2** (`regeln.messe_popup`) an **drei** Dialogen: der Staffelauswahl
   der Seerr-Karte, dem Prüfergebnis der Reparatur-Karte und der Rückfrage vor
-  dem Löschen. Alle drei sind `arrstack-dialog`; die Messung öffnet sie über
-  denselben Weg, den ein Nutzer nimmt.
-* **Regel 1 in jedem der drei Dialoge**: derselbe Texttest mit
-  `arrstack-dialog` als Bezug, ebenfalls bei allen drei Breiten in beiden
-  Themen. Das Element liegt am `document.body`, nicht in der Karte — sein
-  Rechteck ist das Ansichtsfenster. `messe_popup` misst nur Regel 2; ein
-  geöffnetes Popup bliebe für Regel 1 sonst ungemessen.
+  dem Löschen. Die Messung öffnet sie über denselben Weg, den ein Nutzer
+  nimmt.
+
+  `popup_selektor` ist **`.sheet`**, das sichtbare Blatt — nicht der Host
+  `arrstack-dialog`. Der ist `position: fixed; inset: 0`, sein Rechteck also
+  das ganze Fenster: die Scrim-Messung fände keinen Punkt „neben" dem Popup
+  und bliebe ohne Urteil, und Regel 1, Prüfung 2 („liegt im Rechteck") wäre
+  am Dialog leer, weil alles im Fenster liegt.
+* **Regel 1 in jedem der drei Dialoge**: derselbe Texttest mit `.sheet` als
+  Bezug, ebenfalls bei allen drei Breiten in beiden Themen. Bezugsrechteck
+  ist damit das Blatt selbst; ein Text, der darüber hinausragt, wird gemeldet.
+  `messe_popup` misst nur Regel 2; ein geöffnetes Popup bliebe für Regel 1
+  sonst ungemessen.
 * **Gegenprobe** (`regeln.selbsttest`): schlägt die Messung überhaupt an, und
   meldet sie eine gewollte Kürzung *nicht* fälschlich als Verstoß?
 
@@ -410,6 +416,11 @@ try:
         # Alle drei sind `arrstack-dialog` und liegen am document.body; die
         # Karten tragen `container-type: inline-size`, also `contain: layout`,
         # und wären für ein `position: fixed` darin der enthaltende Block.
+        # Unter 450 px ist das Blatt Vollbild — dann gäbe es keinen Punkt
+        # neben dem Popup, und die Scrim-Messung bliebe ohne Urteil. Gemessen
+        # wird deshalb bei 960 px, wo Scrim und Blatt beide Fläche haben.
+        page.set_viewport_size({"width": 960, "height": 1200})
+        page.wait_for_timeout(200)
         alles_zu(page)
         popups["seer_staffeln"] = regeln.messe_popup(
             page,
@@ -419,7 +430,7 @@ try:
                 const row = c.shadowRoot.querySelector('.result');
                 if (row) row.click();
             }"""),
-            popup_selektor="arrstack-dialog",
+            popup_selektor=".sheet",
             schliessen_knopf_selektor=".dlg-close")
 
         alles_zu(page)
@@ -428,7 +439,7 @@ try:
             oeffnen=lambda: page.evaluate(
                 "() => { const b = window.__cards.fix.shadowRoot"
                 "          .querySelector('.act-check'); if (b) b.click(); }"),
-            popup_selektor="arrstack-dialog",
+            popup_selektor=".sheet",
             schliessen_knopf_selektor=".dlg-close")
 
         alles_zu(page)
@@ -437,7 +448,7 @@ try:
             oeffnen=lambda: page.evaluate(
                 "() => { const b = window.__cards.fix.shadowRoot"
                 "          .querySelector('.act-delete'); if (b) b.click(); }"),
-            popup_selektor="arrstack-dialog",
+            popup_selektor=".sheet",
             schliessen_knopf_selektor=".dlg-close")
 
         # ── Regel 1 im Dialog ────────────────────────────────────────────────
@@ -480,7 +491,7 @@ try:
             auf(page)
             ui_dialog[name] = regeln.lauf_breiten(
                 page,
-                messung=lambda p: regeln.messe_text(p, "arrstack-dialog"),
+                messung=lambda p: regeln.messe_text(p, ".sheet"),
                 vor_messung=auf)
             alles_zu(page)
         dialog_auf(page)
