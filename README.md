@@ -181,6 +181,27 @@ Darstellung gegen erfundene Daten, nicht das Zusammenspiel mit einem laufenden
 Radarr — die Integration `arrstack` ist selbst noch nicht am echten System
 getestet.
 
+### Lokale UI-Migration 25.09.2026
+
+Die vier Karten übernehmen den gemeinsamen UI-Vertrag 0.1.0:
+44-px-Kopfmedium, lesbare Status mit Text, mobile Anordnung und mindestens
+44 px hohe Aktionen. Die Karten- und Editoransichten sind bei 320, 480 und
+960 px in Hell und Dunkel als [visuelle Baselines](docs/render/baselines/ui-0.1.0/)
+versioniert. Der Vergleich läuft nach dem Renderlauf mit:
+
+```bash
+docker run --rm \
+  -v "/mnt/user/Data/Claude Projekte/hacs/ha-arrstack-cards:/cards" \
+  --entrypoint bash mcr.microsoft.com/playwright/python:v1.62.0-noble \
+  -c 'pip install --quiet --break-system-packages playwright==1.62.0 >/dev/null; \
+      python3 /cards/docs/render/visual-contract.py /cards/docs/render/ergebnis'
+```
+
+Der Vergleich prüft außerdem Lade-, Fehler- und Leerzustände, sechs Statusarten,
+fehlende Poster, Tastaturöffnung der Suchtreffer, Fokus, Textgrenzen und
+Aktionsflächen. Die Editorbilder verwenden eine sichtbare `ha-form`-Attrappe;
+ein echter HA-Editor und ein Speichervorgang sind damit nicht nachgewiesen.
+
 ## Lizenz
 
 MIT

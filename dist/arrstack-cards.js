@@ -112,7 +112,9 @@ const BRAND_BASE = "https://brands.home-assistant.io/_/";
  * Kennung, und hier steht dann ein eigenes Zeichen.
  */
 function serviceSymbol(brand, fallback = "inbox", size = 22) {
-  return brand ? serviceLogo(brand, size) : arrIcon(fallback, size);
+  return brand
+    ? `<span class="symbol-pair">${serviceLogo(brand, size)}<span hidden>${arrIcon(fallback, size)}</span></span>`
+    : arrIcon(fallback, size);
 }
 
 /** Das Logo eines Dienstes als `<img>`; ohne Kennung nichts. */
@@ -120,7 +122,7 @@ function serviceLogo(brand, size = 22) {
   if (!brand) return "";
   return `<img class="logo" src="${BRAND_BASE}${encodeURIComponent(brand)}/icon.png"
     alt="" loading="lazy" style="width: ${size}px; height: ${size}px"
-    onerror="this.remove()">`;
+    onerror="this.nextElementSibling.hidden=false;this.remove()">`;
 }
 
 /** Ein Symbol als SVG-Zeichenkette. */
@@ -569,12 +571,13 @@ const TEXTE_ARRSTACK_SEER_CARD = {
  * im Shadow DOM und ist ohne Home Assistants Styles `display: inline` — an
  * einem inline dargestellten Element ist `container-type` wirkungslos.
  */
+/* Shared UI contract 0.1.0: standalone Arrstack shell, header, status and actions. */
 const ARRSTACK_TOKENS = `
   :host {
     --arr-space-1: var(--ha-space-1, 4px);
     --arr-space-2: var(--ha-space-2, 8px);
     --arr-space-3: var(--ha-space-3, 12px);
-    --arr-space-4: var(--ha-space-4, 24px);
+    --arr-space-4: var(--ha-space-4, 16px);
     --arr-radius-1: 6px;
     --arr-radius-2: var(--ha-card-border-radius, 12px);
     --arr-font-sm: var(--ha-font-size-s, 0.8125rem);
@@ -592,6 +595,8 @@ const ARRSTACK_TOKENS = `
     --arr-surface: var(--secondary-background-color, rgba(127, 127, 127, 0.12));
     --arr-line: var(--divider-color, rgba(127, 127, 127, 0.25));
     --arr-danger: var(--error-color, #db4437);
+    --arr-success: var(--success-color, var(--primary-color, #03a9f4));
+    --arr-warning: var(--warning-color, var(--primary-color, #03a9f4));
     display: block;
     container-type: inline-size;
   }
@@ -619,10 +624,11 @@ const ARRSTACK_EINZEILIG = `
  * Form da, und ihre Beschriftungen waren inline, also ohne Kastenmaß. */
 const ARRSTACK_GEMEINSAM = `
 
+  /* Shared UI contract 0.1.0: 44 px medium, one title line and optional status. */
   .head {
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
-    justify-content: space-between;
     gap: var(--arr-space-3);
     margin-bottom: var(--arr-space-4);
   }
@@ -633,6 +639,18 @@ const ARRSTACK_GEMEINSAM = `
     min-width: 0;
     flex: 1 1 auto;
   }
+  .head-media {
+    width: 44px;
+    height: 44px;
+    flex: 0 0 44px;
+    display: grid;
+    place-items: center;
+    border-radius: var(--arr-radius-1);
+    background: var(--arr-surface);
+    color: var(--arr-accent);
+  }
+  .symbol-pair { display: inline-flex; align-items: center; justify-content: center; }
+  [hidden] { display: none !important; }
   .title {
     font-size: var(--arr-font-lg);
     font-weight: var(--arr-weight-bold);
@@ -643,6 +661,7 @@ const ARRSTACK_GEMEINSAM = `
     color: var(--arr-muted);
     flex: 0 1 auto;
   }
+  .head-meta.status-badge { max-width: 100%; }
   /* Das echte Logo des Dienstes — es sagt auf einen Blick, ob die Karte auf
      Radarr, Sonarr, SABnzbd oder Jellyseerr schaut. */
   .logo { flex: none; border-radius: var(--arr-radius-1); object-fit: contain; }
@@ -754,10 +773,15 @@ const ARRSTACK_GEMEINSAM = `
     background: none;
     color: var(--arr-accent);
     cursor: pointer;
+    min-height: 44px;
     min-width: 0;
     max-width: 100%;
   }
   button .icon { flex: none; }
+  button:focus-visible, .row.result:focus-visible, .search input:focus-visible {
+    outline: 2px solid var(--arr-accent);
+    outline-offset: 2px;
+  }
   button:hover { background: var(--arr-surface); }
   button[disabled] { color: var(--arr-muted); cursor: default; }
   button.primary {
@@ -781,7 +805,9 @@ const ARRSTACK_GEMEINSAM = `
     display: flex;
     align-items: center;
     gap: var(--arr-space-2);
-    flex: none;
+    flex-wrap: wrap;
+    flex: 0 1 auto;
+    min-width: 0;
   }
 
   .empty {
@@ -806,6 +832,7 @@ const ARRSTACK_GEMEINSAM = `
     overflow-wrap: anywhere;
   }
   .notice.problem { color: var(--arr-danger); }
+  .notice + .rows, .notice + .empty { margin-top: var(--arr-space-3); }
 
   .chip {
     font-size: var(--arr-font-sm);
@@ -815,6 +842,25 @@ const ARRSTACK_GEMEINSAM = `
     color: var(--arr-muted);
     flex: 0 1 auto;
   }
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--arr-space-1);
+    max-width: 100%;
+    min-width: 0;
+    padding: var(--arr-space-1) var(--arr-space-2);
+    border-radius: var(--arr-radius-2);
+    background: var(--arr-surface);
+    color: var(--arr-muted);
+    font-size: var(--arr-font-sm);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .status-badge.success { color: var(--arr-success); background: color-mix(in srgb, var(--arr-success) 12%, transparent); }
+  .status-badge.warning { color: var(--arr-warning); background: color-mix(in srgb, var(--arr-warning) 12%, transparent); }
+  .status-badge.error { color: var(--arr-danger); background: color-mix(in srgb, var(--arr-danger) 12%, transparent); }
+  .status-badge.unavailable { color: var(--arr-danger); }
 
 `;
 
@@ -822,12 +868,13 @@ const ARRSTACK_GEMEINSAM = `
 const ARRSTACK_STYLES = ARRSTACK_TOKENS + ARRSTACK_EINZEILIG + ARRSTACK_GEMEINSAM + `
   ha-card { padding: var(--arr-space-4); }
 
-  /* Schmale Karte: Nebenspalten unter den Inhalt, statt Text abzuschneiden. */
-  @container (max-width: 380px) {
-    ha-card { padding: var(--arr-space-3); }
+  /* Status und Aktionen stehen unter dem Titel, sobald die Karte eng wird. */
+  @container (max-width: 440px) {
+    .head { grid-template-columns: minmax(0, 1fr); gap: var(--arr-space-2); }
+    .head-meta { grid-column: 1; justify-self: start; margin-inline-start: 52px; }
     .row { flex-wrap: wrap; }
-    .row-side { max-width: 100%; }
-    .actions { width: 100%; }
+    .row-side { flex: 1 1 100%; max-width: 100%; flex-direction: row; align-items: center; justify-content: space-between; }
+    .actions { flex: 1 1 100%; width: 100%; }
   }
 `;
 
@@ -892,7 +939,7 @@ const DIALOG_STYLES = ARRSTACK_TOKENS + ARRSTACK_EINZEILIG + ARRSTACK_GEMEINSAM 
     flex: none;
   }
   /* Schließen-X oben links (Design Gallery, Dialogs). */
-  .dlg-close { flex: none; padding: var(--arr-space-1); color: var(--arr-muted); }
+  .dlg-close { flex: none; width: 44px; height: 44px; justify-content: center; padding: 0; color: var(--arr-muted); }
   .dlg-title {
     font-size: var(--arr-font-lg);
     font-weight: var(--arr-weight-bold);
@@ -1238,13 +1285,13 @@ class ArrstackCardBase extends HTMLElement {
   }
 
   /** Kopfzeile mit Logo, Titel und optionaler Nebenauskunft. */
-  _head(icon, meta = "") {
+  _head(icon, meta = "", tone = "") {
     return `<div class="head">
       <div class="head-title">
-        ${serviceSymbol(this._data && this._data.brand, icon, 22)}
+        <span class="head-media">${serviceSymbol(this._data && this._data.brand, icon, 24)}</span>
         <span class="title">${escapeHtml(this._titel())}</span>
       </div>
-      ${meta ? `<span class="head-meta">${escapeHtml(meta)}</span>` : ""}
+      ${meta ? `<span class="head-meta${tone ? ` status-badge ${tone}` : ""}">${escapeHtml(meta)}</span>` : ""}
     </div>`;
   }
 
@@ -1268,6 +1315,27 @@ function queueStatusText(item, t) {
   if (tracked) return tracked;
   const key = String(item.status || "").toLowerCase();
   return t.zustaende[key] || item.status || "";
+}
+
+/** Gemeinsame Statussemantik 0.1.0; der übersetzte Text bleibt fachlich. */
+function queueTone(item) {
+  const tracked = String(item.tracked_state || "").toLowerCase();
+  const status = String(item.status || "").toLowerCase();
+  if (["failed", "failedpending", "importblocked"].includes(tracked) || status === "failed") return "error";
+  if (tracked === "importpending" || ["warning", "delay"].includes(status)) return "warning";
+  if (status.includes("unavailable")) return "unavailable";
+  if (["downloading", "running", "completed"].includes(status) || ["importing", "imported"].includes(tracked)) return "success";
+  if (["queued", "paused", "idle"].includes(status)) return "neutral";
+  return "unknown";
+}
+
+function seerTone(status) {
+  const value = String(status || "").toLowerCase();
+  if (value === "available") return "success";
+  if (value === "partially_available" || value === "processing") return "warning";
+  if (value === "blocklisted") return "error";
+  if (value === "pending" || value === "deleted") return "neutral";
+  return "unknown";
 }
 
 /** Platzhalter der Form `{n}` füllen. */
@@ -1331,16 +1399,13 @@ function formatSince(value, t) {
 
 /** Poster oder ersatzweise ein Symbol — nie ein kaputtes Bild. */
 function posterMarkup(url, brand = null, icon = "film") {
+  const symbol = serviceSymbol(brand, icon, 24);
   if (!url) {
-    // Kein Poster: das Dienst-Logo gedämpft, sonst das Strichsymbol.
-    const inner = brand ? serviceLogo(brand, 24) : arrIcon(icon, 20);
-    // `brand` ist absichtlich leer, wo es kein Markenbild gibt (Seerr).
-    return `<div class="poster poster-fallback">${inner}</div>`;
+    return `<div class="poster poster-fallback">${symbol}</div>`;
   }
-  // Lädt das Bild nicht (TMDB nicht erreichbar), bleibt die Fläche stehen —
-  // ein kaputtes Bildsymbol wäre lauter als die leere Kachel.
+  // Bei einem fehlenden TMDB-Bild erscheint der gleiche fachliche Platzhalter.
   return `<img class="poster" src="${escapeHtml(url)}" alt="" loading="lazy"
-    onerror="this.removeAttribute('src')">`;
+    onerror="this.nextElementSibling.hidden=false;this.remove()"><div class="poster poster-fallback" hidden>${symbol}</div>`;
 }
 
 /* ── Editor: eine Instanz auswählen ─────────────────────────────────────── */
@@ -1593,9 +1658,10 @@ class ArrstackDownloadsCard extends ArrstackCardBase {
           : 0;
     const remaining = leftBytes > 0 ? formatBytes(leftBytes, t) : "";
     const title = item.parent_title || item.title || "";
-    const meta = [item.episode, queueStatusText(item, t), item.category]
+    const meta = [item.episode, item.category]
       .filter(Boolean)
       .join(" · ");
+    const status = queueStatusText(item, t);
     const poster = this._config.show_posters
       ? posterMarkup(item.poster, this._data && this._data.brand, "download")
       : "";
@@ -1609,6 +1675,7 @@ class ArrstackDownloadsCard extends ArrstackCardBase {
       </div>
       <div class="row-side">
         <span class="lead">${Math.round(progress)} %</span>
+        ${status ? `<span class="status-badge ${queueTone(item)}">${escapeHtml(status)}</span>` : ""}
         ${rest ? `<span class="sub">${escapeHtml(rest)}</span>` : ""}
       </div>
     </div>`;
@@ -1749,7 +1816,7 @@ class ArrstackFixCard extends ArrstackCardBase {
     const items = (this._data && this._data.items) || [];
     this.shadowRoot.innerHTML = `<style>${ARRSTACK_STYLES}</style>
       <ha-card>
-        ${this._head("download", items.length ? fuelle(t.offen, { n: items.length }) : "")}
+        ${this._head("download", items.length ? fuelle(t.offen, { n: items.length }) : "", "warning")}
         ${this._message ? `<div class="notice">${escapeHtml(this._message)}</div>` : ""}
         ${this._body(items)}
       </ha-card>`;
@@ -2010,6 +2077,7 @@ class ArrstackSeerCard extends ArrstackCardBase {
       .search input {
         flex: 1 1 auto;
         min-width: 0;
+        min-height: 44px;
         font: inherit;
         font-size: var(--arr-font-md);
         color: var(--arr-text);
@@ -2018,7 +2086,8 @@ class ArrstackSeerCard extends ArrstackCardBase {
         border-radius: var(--arr-radius-1);
         background: var(--arr-surface);
       }
-      .row.result { cursor: pointer; }
+      .search .go { flex: 0 0 44px; width: 44px; justify-content: center; padding: 0; }
+      .row.result { cursor: pointer; min-height: 66px; }
       </style>
       <ha-card>
         ${this._head("jellyfish")}
@@ -2032,16 +2101,6 @@ class ArrstackSeerCard extends ArrstackCardBase {
         ${this._body()}
       </ha-card>`;
     this._bind();
-  }
-
-  /** Die Kopfzeile trägt kein Dienst-Logo: für Jellyseerr gibt es keins. */
-  _head(icon) {
-    return `<div class="head">
-      <div class="head-title">
-        ${serviceSymbol(null, icon, 22)}
-        <span class="title">${escapeHtml(this._titel())}</span>
-      </div>
-    </div>`;
   }
 
   _body() {
@@ -2058,7 +2117,8 @@ class ArrstackSeerCard extends ArrstackCardBase {
     return `<div class="rows">${this._results
       .slice(0, Number(this._config.max_items) || 8)
       .map(
-        (item, index) => `<div class="row result" data-index="${index}">
+        (item, index) => `<div class="row result" data-index="${index}" role="button" tabindex="0"
+          aria-label="${escapeHtml(item.title || "")}">
           ${posterMarkup(item.poster)}
           <div class="row-main">
             <div class="row-title">${escapeHtml(item.title || "")}</div>
@@ -2071,7 +2131,7 @@ class ArrstackSeerCard extends ArrstackCardBase {
                 .join(" · ")
             )}</div>
           </div>
-          <span class="chip">${escapeHtml(statusLabel(item.status, t))}</span>
+          <span class="status-badge ${seerTone(item.status)}">${escapeHtml(statusLabel(item.status, t))}</span>
         </div>`
       )
       .join("")}</div>`;
@@ -2155,9 +2215,13 @@ class ArrstackSeerCard extends ArrstackCardBase {
     const go = this.shadowRoot.querySelector(".go");
     if (go) go.addEventListener("click", () => this._search(input && input.value));
     this.shadowRoot.querySelectorAll(".result").forEach((row) => {
-      row.addEventListener("click", () =>
-        this._openResult(this._results[Number(row.dataset.index)])
-      );
+      const open = () => this._openResult(this._results[Number(row.dataset.index)]);
+      row.addEventListener("click", open);
+      row.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        open();
+      });
     });
   }
 
