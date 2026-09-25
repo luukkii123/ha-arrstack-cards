@@ -18,6 +18,10 @@ Anfrage-Karte weg; wer nur Radarr hat, nimmt die anderen drei.
 
 ## Voraussetzung
 
+Home Assistant **2026.9.3 oder neuer** ist die in `hacs.json` angegebene
+Mindestversion. Der native Editorlauf wurde mit 2026.9.3 geprüft; ältere
+Frontend-Versionen sind für diese Kartenfassung nicht belegt.
+
 Die Integration **arrstack** muss eingerichtet sein. Die Karten sprechen nie
 direkt mit Radarr, Sonarr, SABnzbd oder Jellyseerr — jeder Aufruf geht über
 `hass.callWS` an die Integration, die ihn serverseitig ausführt. Das ist keine

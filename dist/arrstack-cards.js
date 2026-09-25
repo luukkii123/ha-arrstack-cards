@@ -1446,6 +1446,7 @@ class ArrstackCardEditor extends HTMLElement {
     this._basisSchema = [];
     this._woerterbuch = null;
     this._pendingConfigs = [];
+    this._staleConfigs = [];
     // HA-Dashboard-Shortcuts dürfen beim Tippen im Editor nicht mitlaufen.
     // Die Standardaktion (Zeichen eingeben, Auswahl bedienen) bleibt erhalten.
     this.addEventListener("keydown", (event) => event.stopPropagation());
@@ -1466,13 +1467,21 @@ class ArrstackCardEditor extends HTMLElement {
 
   setConfig(config) {
     const next = cloneEditorValue(config || {});
-    const pending = this._pendingConfigs.findIndex((value) => editorValuesEqual(value, next));
+    const pending = this._pendingConfigs.findLastIndex((value) => editorValuesEqual(value, next));
     if (pending !== -1) {
       // Ein älteres HA-Echo darf neuere, noch nicht bestätigte Eingaben nicht löschen.
       if (pending < this._pendingConfigs.length - 1) return;
+      // Auch nach dem neuesten Echo können ältere Echos noch unterwegs sein.
+      this._staleConfigs.push(...this._pendingConfigs.slice(0, -1));
       this._pendingConfigs = [];
     } else {
+      const stale = this._staleConfigs.findIndex((value) => editorValuesEqual(value, next));
+      if (stale !== -1) {
+        this._staleConfigs.splice(stale, 1);
+        return;
+      }
       this._pendingConfigs = [];
+      this._staleConfigs = [];
     }
     if (editorValuesEqual(this._config, next)) return;
     this._config = next;
@@ -1500,7 +1509,8 @@ class ArrstackCardEditor extends HTMLElement {
         this._services.includes(instance.service)
       );
     } catch (error) {
-      this._instances = [];
+      // Null hält einen fehlgeschlagenen Abruf für das nächste hass-Update retrybar.
+      this._instances = null;
     }
     this._render();
   }

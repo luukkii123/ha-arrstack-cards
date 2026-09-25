@@ -93,15 +93,46 @@ async function run() {
 
     form.dispatchEvent({ type: "value-changed", detail: { value: { title: "Neu" } }, stopPropagation() {} });
     assert.equal(editor._config.tap_action.target.entity_id[0], "light.example", `${tag}: Ereignisempfänger verändert keinen Editorstand`);
-    form.dispatchEvent({ type: "value-changed", detail: { value: { max_items: 4 } }, stopPropagation() {} });
+    form.dispatchEvent({ type: "value-changed", detail: { value: { title: "Neu B", max_items: 4 } }, stopPropagation() {} });
     assert.equal(emitted.length, 2);
-    assert.deepEqual({ ...emitted[1] }, { ...original, title: "Neu", max_items: 4 }, `${tag}: zweite Änderung enthält die erste`);
+    assert.deepEqual({ ...emitted[1] }, { ...original, title: "Neu B", max_items: 4 }, `${tag}: zweite Änderung enthält die erste`);
     assert.equal(original.title, "Start", `${tag}: setConfig-Eingabe bleibt unverändert`);
     assert.equal(original.tap_action.target.entity_id[0], "light.example", `${tag}: verschachtelte Eingabe bleibt unverändert`);
     editor.setConfig(emitted[0]);
     assert.equal(form.dataWrites, writes, `${tag}: verspätetes Echo setzt keine jüngere Eingabe zurück`);
     editor.setConfig(emitted[1]);
     assert.equal(form.dataWrites, writes, `${tag}: bestätigtes Echo setzt keinen Fokus zurück`);
+    editor.setConfig(JSON.parse(JSON.stringify(emitted[0])));
+    assert.equal(editor._config.title, "Neu B", `${tag}: spätes altes Echo nach neuestem Echo wird ignoriert`);
+    assert.equal(form.dataWrites, writes, `${tag}: spätes altes Echo ersetzt das aktive Formular nicht`);
+    editor.setConfig({ ...emitted[1], title: "Aus YAML" });
+    assert.equal(editor._config.title, "Aus YAML", `${tag}: bewusste externe Änderung wird übernommen`);
+    assert.equal(form.dataWrites, writes + 1, `${tag}: externe Änderung erreicht das Formular`);
+    editor.setConfig(JSON.parse(JSON.stringify(emitted[0])));
+    assert.equal(editor._config.title, "Neu", `${tag}: bewusste YAML-Rückkehr zu einem früheren Wert bleibt möglich`);
+    assert.equal(form.dataWrites, writes + 2, `${tag}: YAML-Rückkehr aktualisiert das Formular`);
+
+    const retryEditor = new (elements.get(tag))();
+    retryEditor.setConfig(original);
+    let calls = 0;
+    retryEditor.hass = {
+      locale: { language: "de" },
+      callWS: async () => { calls++; throw new Error("temporär nicht erreichbar"); },
+    };
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(calls, 1, `${tag}: erster Instanzabruf lief`);
+    retryEditor.hass = {
+      locale: { language: "de" },
+      callWS: async () => {
+        calls++;
+        return { instances: [{ entry_id: "retry-1",
+          service: tag.includes("seer") ? "seerr" : "sonarr", title: "Wieder da" }] };
+      },
+    };
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(calls, 2, `${tag}: hass-Update wiederholt fehlgeschlagenen Instanzabruf`);
+    assert.equal(retryEditor.children[0].schema.find((field) => field.name === "entry_id")
+      .selector.select.options.length, 1, `${tag}: wiederhergestellte Option erscheint`);
 
     for (const type of ["keydown", "keyup"]) {
       let stopped = 0;
