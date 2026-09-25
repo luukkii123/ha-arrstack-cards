@@ -100,6 +100,8 @@ async function run() {
     assert.equal(original.tap_action.target.entity_id[0], "light.example", `${tag}: verschachtelte Eingabe bleibt unverändert`);
     editor.setConfig(emitted[1]);
     assert.equal(form.dataWrites, writes, `${tag}: bestätigtes Echo setzt keinen Fokus zurück`);
+    editor.setConfig(JSON.parse(JSON.stringify(emitted[1])));
+    assert.equal(form.dataWrites, writes, `${tag}: doppeltes neuestes Echo bleibt idempotent`);
     editor.setConfig(JSON.parse(JSON.stringify(emitted[0])));
     assert.equal(editor._config.title, "Neu B", `${tag}: noch ausstehendes altes Echo nach neuestem Echo wird ignoriert`);
     assert.equal(form.dataWrites, writes, `${tag}: spätes altes Echo ersetzt das aktive Formular nicht`);
@@ -126,11 +128,36 @@ async function run() {
     orderedEditor.setConfig(orderedEmitted[0]);
     assert.equal(orderedEditor._config.title, "B", `${tag}: frühes A-Echo setzt B nicht zurück`);
     assert.equal(orderedForm.dataWrites, beforeEchoWrites, `${tag}: frühes A-Echo ersetzt das Formular nicht`);
+    orderedEditor.setConfig(JSON.parse(JSON.stringify(orderedEmitted[0])));
+    assert.equal(orderedEditor._config.title, "B", `${tag}: doppeltes frühes A-Echo setzt B nicht zurück`);
+    assert.equal(orderedForm.dataWrites, beforeEchoWrites, `${tag}: doppeltes A-Echo ersetzt das Formular nicht`);
     orderedEditor.setConfig(orderedEmitted[1]);
     const orderedWrites = orderedForm.dataWrites;
     orderedEditor.setConfig(JSON.parse(JSON.stringify(orderedEmitted[0])));
     assert.equal(orderedEditor._config.title, "A", `${tag}: bestätigtes A darf später als YAML-Wert zurückkehren`);
     assert.equal(orderedForm.dataWrites, orderedWrites + 1, `${tag}: YAML-Rückkehr nach regulären Echos erreicht das Formular`);
+
+    const repeatedEditor = new (elements.get(tag))();
+    const repeatedEmitted = [];
+    repeatedEditor.addEventListener("config-changed", (event) =>
+      repeatedEmitted.push(JSON.parse(JSON.stringify(event.detail.config))));
+    repeatedEditor.setConfig(original);
+    repeatedEditor.hass = {
+      locale: { language: "de" }, callWS: async () => ({ instances: [] }),
+    };
+    await new Promise((resolve) => setImmediate(resolve));
+    const repeatedForm = repeatedEditor.children[0];
+    for (const title of ["A", "B", "A", "C"]) {
+      repeatedForm.dispatchEvent({ type: "value-changed", detail: { value: { title } }, stopPropagation() {} });
+    }
+    assert.equal(repeatedEmitted.length, 4);
+    assert.deepEqual(repeatedEmitted[0], repeatedEmitted[2], `${tag}: A wird tatsächlich mit identischem Config-Wert wiederholt`);
+    const repeatedWrites = repeatedForm.dataWrites;
+    for (const echo of repeatedEmitted) repeatedEditor.setConfig(JSON.parse(JSON.stringify(echo)));
+    assert.equal(repeatedForm.dataWrites, repeatedWrites, `${tag}: gleiche Werte und ihre Echos ersetzen das Formular nicht`);
+    repeatedEditor.setConfig(JSON.parse(JSON.stringify(repeatedEmitted[0])));
+    assert.equal(repeatedEditor._config.title, "A", `${tag}: wiederholter, bereits bestätigter Wert bleibt extern editierbar`);
+    assert.equal(repeatedForm.dataWrites, repeatedWrites + 1, `${tag}: externe Rückkehr zu A erreicht das Formular`);
 
     const retryEditor = new (elements.get(tag))();
     retryEditor.setConfig(original);

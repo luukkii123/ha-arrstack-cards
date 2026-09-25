@@ -194,7 +194,10 @@ horizontaler Überlauf. Die Screenshots wurden angesehen; das Testdashboard
 wurde danach gelöscht und seine Abwesenheit geprüft. Der reproduzierbare
 Browserlauf steht in `docs/render/live-ha-native.py`; die synthetische
 Dashboard-Konfiguration in `docs/render/live-ha-native-dashboard.json`.
-Sie benötigt eine private, außerhalb des Repositories liegende HA-Zugangsdatei.
+Isolierte Editorinstanzen im echten HA-Frontend prüfen dort zusätzlich die
+Echo-Folgen A,B,A,C, verspätete und doppelte Echos sowie externe Änderungen.
+Der Browserlauf benötigt eine private, außerhalb des Repositories liegende
+HA-Zugangsdatei.
 Das Dashboard muss über die HA-API mit `require_admin: true` und
 `show_in_sidebar: false` angelegt und nach dem Lauf gelöscht werden.
 

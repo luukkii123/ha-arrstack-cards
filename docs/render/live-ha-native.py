@@ -119,6 +119,31 @@ def run(bundle, credentials, dashboard, output):
                     instance_options:s.find(x=>x.name==='entry_id')?.selector.select.options.length,
                     service_options:s.find(x=>x.name==='service')?.selector.select.options.length};
             }""")
+            echo_contract = editor.evaluate("""ed => {
+                const run=(titles,echoes,external) => {
+                    const candidate=document.createElement(ed.localName);
+                    candidate.setConfig({...ed._config,title:'Start'});
+                    candidate.hass=ed._hass;
+                    const form=candidate.querySelector('ha-form');
+                    const snapshots=[];
+                    candidate.addEventListener('config-changed',event=>
+                        snapshots.push(JSON.parse(JSON.stringify(event.detail.config))));
+                    for(const title of titles) form.dispatchEvent(new CustomEvent(
+                        'value-changed',{detail:{value:{title}}}));
+                    for(const index of echoes) candidate.setConfig(
+                        JSON.parse(JSON.stringify(snapshots[index])));
+                    const before=candidate._config.title;
+                    candidate.setConfig(external===null
+                        ? {...candidate._config,title:'Externe Änderung'}
+                        : JSON.parse(JSON.stringify(snapshots[external])));
+                    return {count:snapshots.length,before,after:candidate._config.title};
+                };
+                return {
+                    repeated:run(['A','B','A','C'],[0,1,2,3],0),
+                    late:run(['A','B'],[1,1,0],null),
+                    duplicate:run(['A','B'],[0,0,1],0),
+                };
+            }""")
             geometry = []
             for mode in MODES:
                 page.emulate_media(color_scheme=mode)
@@ -176,6 +201,7 @@ def run(bundle, credentials, dashboard, output):
                         path=str(output / f"card-{kind}-{width}-{mode}.png"))
             report["cards"].append({
                 "kind": kind, "emitted": emitted, "schema": schema,
+                "echo_contract": echo_contract,
                 "keyboard": keyboard,
                 "editor_geometry": geometry, "yaml_kept": yaml_kept,
                 "visual_kept": visual_kept, "save_enabled": save_enabled,
@@ -206,6 +232,10 @@ def main():
                               "connected": True}
                           and item["schema"]["instance_options"] is not None
                           and item["schema"]["service_options"] > 0
+                          and item["echo_contract"] == {
+                              "repeated": {"count": 4, "before": "C", "after": "A"},
+                              "late": {"count": 2, "before": "B", "after": "Externe Änderung"},
+                              "duplicate": {"count": 2, "before": "B", "after": "A"}}
                           and item["yaml_kept"] and item["visual_kept"]
                           and item["save_enabled"]
                           and item["title_in_card"] == item["reopened"]

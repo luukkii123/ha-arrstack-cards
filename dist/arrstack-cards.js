@@ -1468,7 +1468,10 @@ class ArrstackCardEditor extends HTMLElement {
 
   setConfig(config) {
     const next = cloneEditorValue(config || {});
-    const pending = this._pendingConfigs.findLastIndex((value) => editorValuesEqual(value, next));
+    // Gleiche Werte können mehrfach editiert worden sein. Ohne Echo-ID aus HA
+    // ordnen wir sie der frühesten noch offenen passenden Position zu.
+    const pending = this._pendingConfigs.findIndex((value) =>
+      !this._receivedConfigs.has(value) && editorValuesEqual(value, next));
     if (pending !== -1) {
       // Ein älteres HA-Echo darf neuere, noch nicht bestätigte Eingaben nicht löschen.
       if (pending < this._pendingConfigs.length - 1) {
@@ -1481,6 +1484,10 @@ class ArrstackCardEditor extends HTMLElement {
       this._pendingConfigs = [];
       this._receivedConfigs.clear();
     } else {
+      // Wiederholte Echos eines bestätigten oder aktuellen Werts dürfen noch
+      // ausstehende ältere Echos nicht aus der Warteliste entfernen.
+      if (editorValuesEqual(this._config, next) || this._pendingConfigs.some((value) =>
+        this._receivedConfigs.has(value) && editorValuesEqual(value, next))) return;
       const stale = this._staleConfigs.findIndex((value) => editorValuesEqual(value, next));
       if (stale !== -1) {
         this._staleConfigs.splice(stale, 1);
