@@ -1446,6 +1446,7 @@ class ArrstackCardEditor extends HTMLElement {
     this._basisSchema = [];
     this._woerterbuch = null;
     this._pendingConfigs = [];
+    this._receivedConfigs = new Set();
     this._staleConfigs = [];
     // HA-Dashboard-Shortcuts dürfen beim Tippen im Editor nicht mitlaufen.
     // Die Standardaktion (Zeichen eingeben, Auswahl bedienen) bleibt erhalten.
@@ -1470,10 +1471,15 @@ class ArrstackCardEditor extends HTMLElement {
     const pending = this._pendingConfigs.findLastIndex((value) => editorValuesEqual(value, next));
     if (pending !== -1) {
       // Ein älteres HA-Echo darf neuere, noch nicht bestätigte Eingaben nicht löschen.
-      if (pending < this._pendingConfigs.length - 1) return;
-      // Auch nach dem neuesten Echo können ältere Echos noch unterwegs sein.
-      this._staleConfigs.push(...this._pendingConfigs.slice(0, -1));
+      if (pending < this._pendingConfigs.length - 1) {
+        this._receivedConfigs.add(this._pendingConfigs[pending]);
+        return;
+      }
+      // Nur noch ausstehende ältere Echos können nach dem neuesten eintreffen.
+      this._staleConfigs.push(...this._pendingConfigs.slice(0, -1)
+        .filter((value) => !this._receivedConfigs.has(value)));
       this._pendingConfigs = [];
+      this._receivedConfigs.clear();
     } else {
       const stale = this._staleConfigs.findIndex((value) => editorValuesEqual(value, next));
       if (stale !== -1) {
@@ -1481,6 +1487,7 @@ class ArrstackCardEditor extends HTMLElement {
         return;
       }
       this._pendingConfigs = [];
+      this._receivedConfigs.clear();
       this._staleConfigs = [];
     }
     if (editorValuesEqual(this._config, next)) return;

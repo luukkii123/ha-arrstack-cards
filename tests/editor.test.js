@@ -98,12 +98,10 @@ async function run() {
     assert.deepEqual({ ...emitted[1] }, { ...original, title: "Neu B", max_items: 4 }, `${tag}: zweite Änderung enthält die erste`);
     assert.equal(original.title, "Start", `${tag}: setConfig-Eingabe bleibt unverändert`);
     assert.equal(original.tap_action.target.entity_id[0], "light.example", `${tag}: verschachtelte Eingabe bleibt unverändert`);
-    editor.setConfig(emitted[0]);
-    assert.equal(form.dataWrites, writes, `${tag}: verspätetes Echo setzt keine jüngere Eingabe zurück`);
     editor.setConfig(emitted[1]);
     assert.equal(form.dataWrites, writes, `${tag}: bestätigtes Echo setzt keinen Fokus zurück`);
     editor.setConfig(JSON.parse(JSON.stringify(emitted[0])));
-    assert.equal(editor._config.title, "Neu B", `${tag}: spätes altes Echo nach neuestem Echo wird ignoriert`);
+    assert.equal(editor._config.title, "Neu B", `${tag}: noch ausstehendes altes Echo nach neuestem Echo wird ignoriert`);
     assert.equal(form.dataWrites, writes, `${tag}: spätes altes Echo ersetzt das aktive Formular nicht`);
     editor.setConfig({ ...emitted[1], title: "Aus YAML" });
     assert.equal(editor._config.title, "Aus YAML", `${tag}: bewusste externe Änderung wird übernommen`);
@@ -111,6 +109,28 @@ async function run() {
     editor.setConfig(JSON.parse(JSON.stringify(emitted[0])));
     assert.equal(editor._config.title, "Neu", `${tag}: bewusste YAML-Rückkehr zu einem früheren Wert bleibt möglich`);
     assert.equal(form.dataWrites, writes + 2, `${tag}: YAML-Rückkehr aktualisiert das Formular`);
+
+    const orderedEditor = new (elements.get(tag))();
+    const orderedEmitted = [];
+    orderedEditor.addEventListener("config-changed", (event) =>
+      orderedEmitted.push(JSON.parse(JSON.stringify(event.detail.config))));
+    orderedEditor.setConfig(original);
+    orderedEditor.hass = {
+      locale: { language: "de" }, callWS: async () => ({ instances: [] }),
+    };
+    await new Promise((resolve) => setImmediate(resolve));
+    const orderedForm = orderedEditor.children[0];
+    orderedForm.dispatchEvent({ type: "value-changed", detail: { value: { title: "A" } }, stopPropagation() {} });
+    orderedForm.dispatchEvent({ type: "value-changed", detail: { value: { title: "B" } }, stopPropagation() {} });
+    const beforeEchoWrites = orderedForm.dataWrites;
+    orderedEditor.setConfig(orderedEmitted[0]);
+    assert.equal(orderedEditor._config.title, "B", `${tag}: frühes A-Echo setzt B nicht zurück`);
+    assert.equal(orderedForm.dataWrites, beforeEchoWrites, `${tag}: frühes A-Echo ersetzt das Formular nicht`);
+    orderedEditor.setConfig(orderedEmitted[1]);
+    const orderedWrites = orderedForm.dataWrites;
+    orderedEditor.setConfig(JSON.parse(JSON.stringify(orderedEmitted[0])));
+    assert.equal(orderedEditor._config.title, "A", `${tag}: bestätigtes A darf später als YAML-Wert zurückkehren`);
+    assert.equal(orderedForm.dataWrites, orderedWrites + 1, `${tag}: YAML-Rückkehr nach regulären Echos erreicht das Formular`);
 
     const retryEditor = new (elements.get(tag))();
     retryEditor.setConfig(original);
