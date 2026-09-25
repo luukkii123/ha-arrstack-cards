@@ -54,9 +54,19 @@ async function run() {
     "arrstack-seer-card-editor",
   ]) {
     const editor = new (elements.get(tag))();
-    const original = Object.freeze({ type: `custom:${tag.slice(0, -7)}`, title: "Start", refresh_seconds: 15 });
+    const entityIds = Object.freeze(["light.example"]);
+    const target = Object.freeze({ entity_id: entityIds });
+    const tapAction = Object.freeze({ action: "perform-action", target });
+    const original = Object.freeze({
+      type: `custom:${tag.slice(0, -7)}`, title: "Start", refresh_seconds: 15,
+      tap_action: tapAction,
+    });
     const emitted = [];
-    editor.addEventListener("config-changed", (event) => emitted.push(event.detail.config));
+    editor.addEventListener("config-changed", (event) => {
+      emitted.push(JSON.parse(JSON.stringify(event.detail.config)));
+      event.detail.config.tap_action.target.entity_id[0] = "light.changed_by_consumer";
+      assert.equal(event.detail.config.tap_action.target.entity_id[0], "light.changed_by_consumer");
+    });
     editor.setConfig(original);
     editor.hass = {
       locale: { language: "de" },
@@ -73,17 +83,21 @@ async function run() {
 
     const writes = form.dataWrites;
     const schemaWrites = form.schemaWrites;
-    editor.setConfig({ ...original });
+    form.currentData.tap_action.target.entity_id[0] = "light.changed_by_form";
+    assert.equal(editor._config.tap_action.target.entity_id[0], "light.example", `${tag}: Formular besitzt eigene Daten`);
+    editor.setConfig(JSON.parse(JSON.stringify(original)));
     editor.hass = { ...editor._hass, locale: { language: "en" } };
     assert.equal(form.dataWrites, writes, `${tag}: gleiche Config und hass dürfen Eingabe nicht zurücksetzen`);
     assert.equal(form.schemaWrites, schemaWrites, `${tag}: hass darf das Schema nicht neu aufbauen`);
     assert.notEqual(form.computeLabel(form.schema[0]), "Überschrift");
 
     form.dispatchEvent({ type: "value-changed", detail: { value: { title: "Neu" } }, stopPropagation() {} });
+    assert.equal(editor._config.tap_action.target.entity_id[0], "light.example", `${tag}: Ereignisempfänger verändert keinen Editorstand`);
     form.dispatchEvent({ type: "value-changed", detail: { value: { max_items: 4 } }, stopPropagation() {} });
     assert.equal(emitted.length, 2);
     assert.deepEqual({ ...emitted[1] }, { ...original, title: "Neu", max_items: 4 }, `${tag}: zweite Änderung enthält die erste`);
     assert.equal(original.title, "Start", `${tag}: setConfig-Eingabe bleibt unverändert`);
+    assert.equal(original.tap_action.target.entity_id[0], "light.example", `${tag}: verschachtelte Eingabe bleibt unverändert`);
     editor.setConfig(emitted[0]);
     assert.equal(form.dataWrites, writes, `${tag}: verspätetes Echo setzt keine jüngere Eingabe zurück`);
     editor.setConfig(emitted[1]);

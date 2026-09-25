@@ -1345,6 +1345,26 @@ function posterMarkup(url, brand = null, icon = "film") {
 
 /* ── Editor: eine Instanz auswählen ─────────────────────────────────────── */
 
+/** Lovelace-Konfigurationen sind JSON-Werte; interne und externe Daten trennen. */
+function cloneEditorValue(value) {
+  if (Array.isArray(value)) return value.map(cloneEditorValue);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entry]) => [key, cloneEditorValue(entry)])
+    );
+  }
+  return value;
+}
+
+function editorValuesEqual(a, b) {
+  if (Object.is(a, b)) return true;
+  if (!a || !b || typeof a !== "object" || typeof b !== "object" ||
+      Array.isArray(a) !== Array.isArray(b)) return false;
+  const keys = Object.keys(a);
+  return keys.length === Object.keys(b).length &&
+    keys.every((key) => Object.hasOwn(b, key) && editorValuesEqual(a[key], b[key]));
+}
+
 /** Gemeinsamer Editor. Die Auswahl kommt aus `arrstack/instances`.
  *
  * Ohne Auswahl bleibt die Karte gültig — die Integration löst dann selbst
@@ -1380,11 +1400,8 @@ class ArrstackCardEditor extends HTMLElement {
   }
 
   setConfig(config) {
-    const next = { ...(config || {}) };
-    const gleich = (a, b) => a && b &&
-      Object.keys(a).length === Object.keys(b).length &&
-      Object.keys(a).every((key) => Object.hasOwn(b, key) && a[key] === b[key]);
-    const pending = this._pendingConfigs.findIndex((value) => gleich(value, next));
+    const next = cloneEditorValue(config || {});
+    const pending = this._pendingConfigs.findIndex((value) => editorValuesEqual(value, next));
     if (pending !== -1) {
       // Ein älteres HA-Echo darf neuere, noch nicht bestätigte Eingaben nicht löschen.
       if (pending < this._pendingConfigs.length - 1) return;
@@ -1392,7 +1409,7 @@ class ArrstackCardEditor extends HTMLElement {
     } else {
       this._pendingConfigs = [];
     }
-    if (gleich(this._config, next)) return;
+    if (editorValuesEqual(this._config, next)) return;
     this._config = next;
     this._render();
   }
@@ -1461,14 +1478,14 @@ class ArrstackCardEditor extends HTMLElement {
       };
       this._form.addEventListener("value-changed", (event) => {
         event.stopPropagation();
-        this._config = { ...this._config, ...event.detail.value };
+        this._config = { ...this._config, ...cloneEditorValue(event.detail.value || {}) };
         this._pendingConfigs.push(this._config);
         // ha-form besitzt den gerade editierten Zustand bereits. Kein
         // data-Reset während einer Tastatureingabe oder beim HA-Echo.
         this._renderedConfig = this._config;
         this.dispatchEvent(
           new CustomEvent("config-changed", {
-            detail: { config: { ...this._config } },
+            detail: { config: cloneEditorValue(this._config) },
             bubbles: true,
             composed: true,
           })
@@ -1482,7 +1499,7 @@ class ArrstackCardEditor extends HTMLElement {
     }
     this._form.hass = this._hass;
     if (this._renderedConfig !== this._config) {
-      this._form.data = this._config;
+      this._form.data = cloneEditorValue(this._config);
       this._renderedConfig = this._config;
     }
   }
