@@ -136,7 +136,7 @@ alles darunter erreicht den Browser nie.
 
 ## Geprüft
 
-**Stand 09.09.2026, `CARD_VERSION` 0.2.1** — gemessen gegen die vier
+**Stand 25.09.2026, `CARD_VERSION` 0.4.0** — gemessen gegen die vier
 verbindlichen UI-Regeln: Text bleibt in seiner Karte · Popups schließen mit
 Escape, Scrim und Zurück · alles im Editor einrichtbar, jedes Feld erklärt,
 zweisprachig · Home-Assistant-Design.
@@ -163,7 +163,7 @@ docker run --rm \
 
 | Was | Umfang | Ergebnis |
 | --- | --- | --- |
-| Regel 1, alle vier Karten | jede im vollen Zustand (die Anfrage-Karte mit Treffern, nicht leer): 320 / 480 / 960 px × hell / dunkel, je einmal mit und ohne die `--ha-space-*`-Variablen — 528 Textelemente | 0 Überlauf, 0 außerhalb der Karte, 0 Überlappung, 0 „kein Urteil"; 72 gewollte Kürzungen |
+| Regel 1, alle vier Karten | jede im vollen Zustand (die Anfrage-Karte mit Treffern, nicht leer): 320 / 480 / 960 px × hell / dunkel, je einmal mit und ohne die `--ha-space-*`-Variablen — 540 Textelemente | 0 Überlauf, 0 außerhalb der Karte, 0 Überlappung, 0 „kein Urteil"; 70 gewollte Kürzungen |
 | Regel 1 in jedem der drei Dialoge | dieselben sechs Fassungen je Dialog, Bezugsrechteck ist das Dialogblatt selbst — 114 Textelemente | 0 Verstöße, 0 „kein Urteil" |
 | Regel 2, drei Dialoge (Staffelauswahl, Dateien prüfen, Löschen bestätigen) | Escape · `history.back()` · Schließ-Knopf · `elementFromPoint` · Klick neben den Dialog | 15 von 15 bestanden |
 | Regel 2, zusätzlich | Breite 560/320 px, Vollbild unter 450 px, `z-index` | 560 / 320 px, Vollbild 320×1200, `z-index: 100000` |
@@ -176,10 +176,29 @@ geschoben — eine fehlerhafte, die gemeldet werden **muss**, und eine korrekt
 gekürzte, die **nicht** gemeldet werden darf. Beide Gegenproben schlugen wie
 verlangt an. Ohne das wäre ein Lauf mit null Verstößen wertlos.
 
-**Was noch aussteht:** ein Lauf in einem echten Home Assistant. Geprüft ist die
-Darstellung gegen erfundene Daten, nicht das Zusammenspiel mit einem laufenden
-Radarr — die Integration `arrstack` ist selbst noch nicht am echten System
-getestet.
+**Natives HA-Frontend 2026.9.3:** Ein kurzzeitig angelegtes, verstecktes und
+adminbeschränktes Testdashboard enthielt vier Panelansichten mit erfundenen
+Titeln und einer ungültigen Testinstanz. Das lokale Bundle wurde nur im
+Testbrowser unter isolierten Elementnamen geladen. Alle vier echten
+`ha-form`-Editoren gaben beim Tippen sofort eine vollständige Konfiguration
+aus; Visual→YAML→Visual, Speichern und Wiederöffnen erhielten die Werte.
+Ein frisches Rücklesen der Lovelace-Konfiguration bestätigte alle vier Titel
+sowie `entry_id` und `refresh_seconds: 0`. Der Test prüfte außerdem
+Tastaturereignisse, Instanzoptionen und 24 Editor- sowie 24 Kartenvarianten
+bei 320/480/960 px in Hell und Dunkel: keine Seitenfehler und kein
+horizontaler Überlauf. Die Screenshots wurden angesehen; das Testdashboard
+wurde danach gelöscht und seine Abwesenheit geprüft. Der reproduzierbare
+Browserlauf steht in `docs/render/live-ha-native.py`; die synthetische
+Dashboard-Konfiguration in `docs/render/live-ha-native-dashboard.json`.
+Sie benötigt eine private, außerhalb des Repositories liegende HA-Zugangsdatei.
+Das Dashboard muss über die HA-API mit `require_admin: true` und
+`show_in_sidebar: false` angelegt und nach dem Lauf gelöscht werden.
+
+**Grenze:** Die drei Instanzkarten zeigten mit der ungültigen Instanz nur den
+Fehlerzustand, die Seer-Karte ihre leere Suche. Inhalt, Aktionen und Dialoge
+mit erfundenen API-Daten sind im
+Renderlauf geprüft; produktive Radarr-, Sonarr-, SABnzbd- und Seerr-Aktionen
+wurden nicht ausgelöst.
 
 ### Lokale UI-Migration 25.09.2026
 
