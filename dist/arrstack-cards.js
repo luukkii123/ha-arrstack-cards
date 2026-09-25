@@ -1360,6 +1360,11 @@ class ArrstackCardEditor extends HTMLElement {
     this._services = ["sonarr", "radarr", "sabnzbd", "seerr"];
     this._basisSchema = [];
     this._woerterbuch = null;
+    this._pendingConfigs = [];
+    // HA-Dashboard-Shortcuts dürfen beim Tippen im Editor nicht mitlaufen.
+    // Die Standardaktion (Zeichen eingeben, Auswahl bedienen) bleibt erhalten.
+    this.addEventListener("keydown", (event) => event.stopPropagation());
+    this.addEventListener("keyup", (event) => event.stopPropagation());
   }
 
   /** Von den Unterklassen gesetzt: Dienste, Schema und Wörterbuch. */
@@ -1375,7 +1380,20 @@ class ArrstackCardEditor extends HTMLElement {
   }
 
   setConfig(config) {
-    this._config = config || {};
+    const next = { ...(config || {}) };
+    const gleich = (a, b) => a && b &&
+      Object.keys(a).length === Object.keys(b).length &&
+      Object.keys(a).every((key) => Object.hasOwn(b, key) && a[key] === b[key]);
+    const pending = this._pendingConfigs.findIndex((value) => gleich(value, next));
+    if (pending !== -1) {
+      // Ein älteres HA-Echo darf neuere, noch nicht bestätigte Eingaben nicht löschen.
+      if (pending < this._pendingConfigs.length - 1) return;
+      this._pendingConfigs = [];
+    } else {
+      this._pendingConfigs = [];
+    }
+    if (gleich(this._config, next)) return;
+    this._config = next;
     this._render();
   }
 
@@ -1443,9 +1461,14 @@ class ArrstackCardEditor extends HTMLElement {
       };
       this._form.addEventListener("value-changed", (event) => {
         event.stopPropagation();
+        this._config = { ...this._config, ...event.detail.value };
+        this._pendingConfigs.push(this._config);
+        // ha-form besitzt den gerade editierten Zustand bereits. Kein
+        // data-Reset während einer Tastatureingabe oder beim HA-Echo.
+        this._renderedConfig = this._config;
         this.dispatchEvent(
           new CustomEvent("config-changed", {
-            detail: { config: { ...this._config, ...event.detail.value } },
+            detail: { config: { ...this._config } },
             bubbles: true,
             composed: true,
           })
@@ -1453,9 +1476,15 @@ class ArrstackCardEditor extends HTMLElement {
       });
       this.appendChild(this._form);
     }
-    this._form.schema = this._schema();
+    if (this._renderedInstances !== this._instances) {
+      this._form.schema = this._schema();
+      this._renderedInstances = this._instances;
+    }
     this._form.hass = this._hass;
-    this._form.data = this._config;
+    if (this._renderedConfig !== this._config) {
+      this._form.data = this._config;
+      this._renderedConfig = this._config;
+    }
   }
 }
 
