@@ -1,7 +1,7 @@
-/* BEGIN BUSCH SHARED UI 0.2.0 sha256:31637c8f3ea97a0a56d0de9264e5991aedd7ea0d7c3c747d08afff93fcc4e492 */
-/** Busch UI 0.2.0 — standalone Vanilla source. Synchronized verbatim, never imported at runtime. */
+/* BEGIN BUSCH SHARED UI 0.3.0 sha256:0bd2486252eeba30468ee5e6dd5ac30594562f69457f8bf89a4ebf7b25cfd297 */
+/** Busch UI 0.3.0 — standalone Vanilla source. Synchronized verbatim, never imported at runtime. */
 const BuschUI = (() => {
-  const sourceVersion = '0.2.0';
+  const sourceVersion = '0.3.0';
   const cloneConfig = value => Array.isArray(value) ? value.map(cloneConfig)
     : value && typeof value === 'object' ? Object.fromEntries(Object.entries(value).map(([key,item]) => [key,cloneConfig(item)])) : value;
   function configsEqual(a,b) {
@@ -40,7 +40,9 @@ const BuschUI = (() => {
   class EditorBase extends (typeof HTMLElement==='undefined'?class{}:HTMLElement) {
     constructor() {super();guardEditorKeys(this);}
     _acceptConfig(config,normalize=cloneConfig) {
-      const next=cloneConfig(normalize(config));
+      const result=validateConfig(config,{normalize});
+      if(!result.ok)throw result.error;
+      const next=result.value;
       if (configsEqual(next,this._config)) return false;
       this._config=next;return true;
     }
@@ -114,16 +116,82 @@ const BuschUI = (() => {
     },
     input({native=false}={}) {return document.createElement(!native&&typeof customElements!=='undefined'&&customElements.get?.('ha-input')?'ha-input':'input');},
     icon(name) {const icon=document.createElement('ha-icon');icon.setAttribute('icon',name);return icon;},
-    async cardHelpers() {
-      if (helperPromise) return helperPromise;
+    async cardHelpers({requireRow=false}={}) {
+      if (!helperPromise) {
       if (typeof window==='undefined'||typeof window.loadCardHelpers!=='function') return null;
       helperPromise=Promise.resolve().then(()=>window.loadCardHelpers()).then(helpers=>helpers&&typeof helpers.createCardElement==='function'?helpers:null).catch(()=>null);
-      const helpers=await helperPromise;if (!helpers) helperPromise=null;return helpers;
+      }
+      const helpers=await helperPromise;
+      if(!helpers||(requireRow&&typeof helpers.createRowElement!=='function')){helperPromise=null;return null;}
+      return helpers;
     },
   };
   const tokens=Object.freeze({space1:'var(--ha-space-1, 4px)',space2:'var(--ha-space-2, 8px)',space3:'var(--ha-space-3, 12px)',space4:'var(--ha-space-4, 16px)',mediaRadius:'var(--ha-card-border-radius, 12px)',controlMinHeight:'44px'});
-  const language=hass=>String(hass?.locale?.language||(typeof navigator!=='undefined'?navigator.language:'en')).startsWith('de')?'de':'en';
-  return Object.freeze({sourceVersion,EditorBase,cloneConfig,configsEqual,updateConfig,updateConfigPath,deleteConfigPath,emitConfigChanged,guardEditorKeys,createEchoState,queueEcho,acceptEcho,resolveMedia,media,statusSemantic,statusBadge,metric,formatNumber,ha,tokens,language});
+  function language(hass,{legacy=false,browser=true}={}) {
+    const code=hass?.locale?.language||(legacy&&hass?.language)||(browser&&typeof navigator!=='undefined'&&navigator.language)||'en';
+    return String(code).toLowerCase().startsWith('de')?'de':'en';
+  }
+  const dictionary=(table,hass,options)=>table[language(hass,options)]||table.en;
+  function fieldText(table,hass,name,options) {
+    const words=dictionary(table,hass,options),fallback=table.en||{};
+    return {label:words?.labels?.[name]??fallback.labels?.[name]??name,helper:words?.helpers?.[name]??fallback.helpers?.[name]??''};
+  }
+  function validateConfig(input,{parse=false,normalize=cloneConfig,validate}={}) {
+    try {
+      const copied=cloneConfig(parse?JSON.parse(input):input);
+      const error=validate?.(copied);
+      if(error) return {ok:false,error:error instanceof Error?error:new Error(String(error))};
+      return {ok:true,value:cloneConfig(normalize(copied))};
+    } catch(error) {return {ok:false,error};}
+  }
+  const addClass=(node,name)=>{if(!String(node.className||'').split(/\s+/).includes(name))node.className=((node.className||'')+' '+name).trim();};
+  function header({node=document.createElement('div'),titleNode,label}={}) {
+    addClass(node,'busch-ui-header');node.setAttribute('role','group');
+    const name=label??titleNode?.textContent;if(name)node.setAttribute('aria-label',name);
+    if(titleNode){if(!/^H[1-6]$/.test(titleNode.tagName||'')){titleNode.setAttribute('role','heading');titleNode.setAttribute('aria-level','2');}addClass(titleNode,'busch-ui-title');}
+    return node;
+  }
+  const actionBindings=new WeakMap();
+  function action({node=document.createElement('button'),label,text,icon,disabled,variant='secondary',onClick}={}) {
+    if(!label)throw new Error('Action requires an accessible label');
+    addClass(node,'busch-ui-action');node.type='button';node.setAttribute('aria-label',label);node.setAttribute('data-variant',variant);
+    if(disabled!==undefined)node.disabled=disabled;
+    let binding=actionBindings.get(node);
+    if(!binding){
+      binding={};actionBindings.set(node,binding);
+      // Keep native keyboard activation and owning tablist arrow navigation.
+      for(const type of ['keydown','keyup'])node.addEventListener(type,event=>{if(event.key==='Enter'||event.key===' ')event.stopPropagation();});
+      node.addEventListener('click',event=>{event.stopPropagation();if(!node.disabled)binding.onClick?.(event);});
+    }
+    binding.onClick=onClick;
+    if(text!==undefined){node.textContent=text;binding.icon=null;}
+    if(icon){if(!binding.icon){binding.icon=ha.icon(icon);binding.icon.setAttribute('aria-hidden','true');node.appendChild(binding.icon);}else binding.icon.setAttribute('icon',icon);}
+    if(icon||text===undefined){if(!node.title||node.title===binding.tooltip){node.title=label;binding.tooltip=label;}}
+    return node;
+  }
+
+  function section({title,content,open=false}={}) {
+    const node=document.createElement('details');
+    addClass(node,'busch-ui-section');node.open=open;
+    const summary=document.createElement('summary');summary.textContent=title;node.appendChild(summary);
+    if(content)node.appendChild(content);return node;
+  }
+  // Scoped bases: family layout/grid/padding and domain presentation override
+  // these fundamentals. No global selectors or services in shared primitives.
+  const cardStyles=`
+.busch-ui-header{min-width:0}.busch-ui-title{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+:where(.busch-ui-action){box-sizing:border-box;min-height:44px;min-width:44px;max-width:100%;font:inherit;cursor:pointer}
+:where(.busch-ui-action):focus-visible{outline:2px solid var(--primary-color,#03a9f4);outline-offset:2px}
+:where(.busch-ui-action):disabled{cursor:default}:where(.busch-ui-action[data-variant=danger]){color:var(--error-color,#db4437)}
+`;
+  const editorStyles=cardStyles+`
+:host(.busch-ui-editor),.busch-ui-editor{display:block;min-width:0;color:var(--primary-text-color,#212121);font:inherit}
+:host(.busch-ui-editor) ha-form,.busch-ui-editor ha-form{display:block;min-width:0}.busch-ui-section{min-width:0}
+.busch-ui-section>summary{cursor:pointer;min-height:44px;box-sizing:border-box;overflow-wrap:anywhere;font-weight:var(--ha-font-weight-medium,500)}
+.busch-ui-section>summary:focus-visible{outline:2px solid var(--primary-color,#03a9f4);outline-offset:2px}
+.busch-ui-validation{color:var(--error-color,#db4437);overflow-wrap:anywhere;font-size:var(--ha-font-size-s,12px)}
+`;
+  return Object.freeze({sourceVersion,EditorBase,cloneConfig,configsEqual,updateConfig,updateConfigPath,deleteConfigPath,emitConfigChanged,guardEditorKeys,createEchoState,queueEcho,acceptEcho,resolveMedia,media,statusSemantic,statusBadge,metric,formatNumber,ha,tokens,language,dictionary,fieldText,validateConfig,header,action,section,cardStyles,editorStyles});
 })();
 /* END BUSCH SHARED UI */
 
@@ -994,7 +1062,7 @@ const ARRSTACK_GEMEINSAM = `
 `;
 
 /** Nur die Karte: ha-card, Kopfzeile und die Container-Query. */
-const ARRSTACK_STYLES = ARRSTACK_TOKENS + ARRSTACK_EINZEILIG + ARRSTACK_GEMEINSAM + `
+const ARRSTACK_STYLES = BuschUI.cardStyles + ARRSTACK_TOKENS + ARRSTACK_EINZEILIG + ARRSTACK_GEMEINSAM + `
   ha-card { padding: var(--arr-space-4); }
 
   /* Status und Aktionen stehen unter dem Titel, sobald die Karte eng wird. */
@@ -1323,10 +1391,7 @@ class ArrstackCardBase extends HTMLElement {
 
   /** `de` oder `en` — die Sprache, die der Nutzer in HA eingestellt hat. */
   _sprache() {
-    return sprachSchluessel(
-      (this._hass && this._hass.locale && this._hass.locale.language) ||
-        (typeof navigator !== "undefined" ? navigator.language : "en")
-    );
+    return BuschUI.language(this._hass);
   }
 
   /** Der nutzersichtbare Teil des Wörterbuchs dieser Karte. */
@@ -1415,13 +1480,13 @@ class ArrstackCardBase extends HTMLElement {
 
   /** Kopfzeile mit Logo, Titel und optionaler Nebenauskunft. */
   _head(icon, meta = "", tone = "") {
-    return `<div class="head">
-      <div class="head-title">
+    const node=document.createElement('div');node.className='head';
+    node.innerHTML=`<div class="head-title">
         <span class="head-media">${serviceSymbol(this._data && this._data.brand, icon, 24)}</span>
         <span class="title">${escapeHtml(this._titel())}</span>
       </div>
-      ${meta ? `<span class="head-meta${tone ? ` status-badge ${tone}` : ""}">${escapeHtml(meta)}</span>` : ""}
-    </div>`;
+      ${meta ? `<span class="head-meta${tone ? ` status-badge ${tone}` : ""}">${escapeHtml(meta)}</span>` : ""}`;
+    return BuschUI.header({node,titleNode:node.querySelector('.title')}).outerHTML;
   }
 
   getCardSize() {
@@ -1578,7 +1643,7 @@ class ArrstackCardEditor extends BuschUI.EditorBase {
   }
 
   setConfig(config) {
-    const next = cloneEditorValue(config || {});
+    const next = BuschUI.validateConfig(config || {}).value;
     if (!BuschUI.acceptEcho(this._echoState,next,this._config)) return;
     this._config = next;
     this._render();
@@ -1591,10 +1656,7 @@ class ArrstackCardEditor extends BuschUI.EditorBase {
   }
 
   _sprache() {
-    return sprachSchluessel(
-      (this._hass && this._hass.locale && this._hass.locale.language) ||
-        (typeof navigator !== "undefined" ? navigator.language : "en")
-    );
+    return BuschUI.language(this._hass);
   }
 
   async _loadInstances() {
@@ -1640,12 +1702,10 @@ class ArrstackCardEditor extends BuschUI.EditorBase {
     if (!this._form) {
       this._form = BuschUI.ha.form();
       this._form.computeLabel = (schema) => {
-        const wb = this._woerterbuch[this._sprache()];
-        return wb.labels[schema.name] || schema.name;
+        return BuschUI.fieldText(this._woerterbuch,this._hass,schema.name).label;
       };
       this._form.computeHelper = (schema) => {
-        const wb = this._woerterbuch[this._sprache()];
-        return wb.helpers[schema.name] || "";
+        return BuschUI.fieldText(this._woerterbuch,this._hass,schema.name).helper;
       };
       this._form.addEventListener("value-changed", (event) => {
         event.stopPropagation();
@@ -1656,7 +1716,8 @@ class ArrstackCardEditor extends BuschUI.EditorBase {
         this._renderedConfig = this._config;
         BuschUI.emitConfigChanged(this,this._config);
       });
-      this.appendChild(this._form);
+      const style=document.createElement('style');style.textContent=BuschUI.editorStyles;this.classList?.add('busch-ui-editor');
+      this.appendChild(this._form);this.appendChild(style);
     }
     if (this._renderedInstances !== this._instances) {
       this._form.schema = this._schema();
@@ -1962,9 +2023,9 @@ class ArrstackFixCard extends ArrstackCardBase {
       const itemId = Number(row.dataset.item);
       const titel = row.querySelector(".row-title").textContent.trim();
       const check = row.querySelector(".act-check");
-      if (check) check.addEventListener("click", () => this._check(downloadId));
+      if (check) BuschUI.action({node:check,label:check.getAttribute("aria-label")||check.title||this._t().pruefen,onClick:() => this._check(downloadId)});
       const del = row.querySelector(".act-delete");
-      if (del) del.addEventListener("click", () => this._fragLoeschen(itemId, titel));
+      if (del) BuschUI.action({node:del,label:del.getAttribute("aria-label")||del.title||this._t().loeschen,variant:"danger",onClick:() => this._fragLoeschen(itemId, titel)});
     });
   }
 
@@ -2313,7 +2374,7 @@ class ArrstackSeerCard extends ArrstackCardBase {
       });
     }
     const go = this.shadowRoot.querySelector(".go");
-    if (go) go.addEventListener("click", () => this._search(input && input.value));
+    if (go) BuschUI.action({node:go,label:go.getAttribute("aria-label")||go.title||go.textContent,onClick:() => this._search(input && input.value)});
     this.shadowRoot.querySelectorAll(".result").forEach((row) => {
       const open = () => this._openResult(this._results[Number(row.dataset.index)]);
       row.addEventListener("click", open);
