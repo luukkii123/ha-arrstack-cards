@@ -1,3 +1,132 @@
+/* BEGIN BUSCH SHARED UI 0.2.0 sha256:31637c8f3ea97a0a56d0de9264e5991aedd7ea0d7c3c747d08afff93fcc4e492 */
+/** Busch UI 0.2.0 — standalone Vanilla source. Synchronized verbatim, never imported at runtime. */
+const BuschUI = (() => {
+  const sourceVersion = '0.2.0';
+  const cloneConfig = value => Array.isArray(value) ? value.map(cloneConfig)
+    : value && typeof value === 'object' ? Object.fromEntries(Object.entries(value).map(([key,item]) => [key,cloneConfig(item)])) : value;
+  function configsEqual(a,b) {
+    if (Object.is(a,b)) return true;
+    if (!a || !b || typeof a !== 'object' || typeof b !== 'object' || Array.isArray(a)!==Array.isArray(b)) return false;
+    if (Array.isArray(a) && a.length!==b.length) return false;
+    const keys=Object.keys(a);
+    return keys.length===Object.keys(b).length && keys.every(key=>Object.hasOwn(b,key)&&configsEqual(a[key],b[key]));
+  }
+  const validKey = key => !['__proto__','prototype','constructor'].includes(String(key));
+  function updateConfig(config,patch) {
+    const next=cloneConfig(config||{});
+    for (const [key,value] of Object.entries(patch||{})) {
+      if (!validKey(key)) throw new Error('Invalid editor config key');
+      if (value===undefined) delete next[key]; else next[key]=cloneConfig(value);
+    }
+    return next;
+  }
+  function updateConfigPath(config,path,value) {
+    const parts=Array.isArray(path)?path:String(path).split('.');
+    if (!parts.length || parts.some(key=>!String(key)||!validKey(key))) throw new Error('Invalid editor config path');
+    const next=cloneConfig(config||{});let node=next;
+    for (let i=0;i<parts.length-1;i++) {const key=parts[i];if (!Object.hasOwn(node,key)||!node[key]||typeof node[key]!=='object') node[key]=typeof parts[i+1]==='number'?[]:{};node=node[key];}
+    const key=parts.at(-1);
+    if (value===undefined) {if (Array.isArray(node)&&typeof key==='number') node.splice(key,1);else delete node[key];} else node[key]=cloneConfig(value);
+    return next;
+  }
+  const deleteConfigPath=(config,path)=>updateConfigPath(config,path,undefined);
+  function emitConfigChanged(editor,config) {
+    editor.dispatchEvent(new CustomEvent('config-changed',{detail:{config:cloneConfig(config)},bubbles:true,composed:true}));
+  }
+  function guardEditorKeys(root) {
+    root.addEventListener?.('keydown',event=>event.stopPropagation());
+    root.addEventListener?.('keyup',event=>event.stopPropagation());
+  }
+  class EditorBase extends (typeof HTMLElement==='undefined'?class{}:HTMLElement) {
+    constructor() {super();guardEditorKeys(this);}
+    _acceptConfig(config,normalize=cloneConfig) {
+      const next=cloneConfig(normalize(config));
+      if (configsEqual(next,this._config)) return false;
+      this._config=next;return true;
+    }
+    _publishConfig(config) {
+      const next=cloneConfig(config);this._config=next;emitConfigChanged(this,next);return next;
+    }
+  }
+  // HA supplies no echo ID: match the earliest unacknowledged equal snapshot.
+  const createEchoState=()=>({pending:[],received:new Set(),stale:[]});
+  function queueEcho(state,config) {state.pending.push(cloneConfig(config));}
+  function acceptEcho(state,next,current) {
+    const pending=state.pending.findIndex(value=>!state.received.has(value)&&configsEqual(value,next));
+    if (pending!==-1) {
+      if (pending<state.pending.length-1) {state.received.add(state.pending[pending]);return false;}
+      state.stale.push(...state.pending.slice(0,-1).filter(value=>!state.received.has(value)));
+      state.pending=[];state.received.clear();
+    } else {
+      if (configsEqual(current,next)||state.pending.some(value=>state.received.has(value)&&configsEqual(value,next))) return false;
+      const stale=state.stale.findIndex(value=>configsEqual(value,next));
+      if (stale!==-1) {state.stale.splice(stale,1);return false;}
+      state.pending=[];state.received.clear();state.stale=[];
+    }
+    return !configsEqual(current,next);
+  }
+  function resolveMedia(config={},metadata={},defaultIcon='mdi:devices') {
+    const safe=value=>typeof value==='string'&&value.trim()&&!/^(?:javascript|vbscript|file):/i.test(value.trim())?value.trim():null;
+    const available=[metadata.entity_picture,metadata.device_picture,metadata.picture].map(safe).filter(Boolean),custom=safe(config.image),mode=config.display_mode||'auto';
+    const images=mode==='icon'?[]:[...new Set((mode==='image'?[custom,...available]:[...available,custom]).filter(Boolean))];
+    return {image:images[0]||null,images,icon:config.icon||metadata.icon||defaultIcon};
+  }
+  function media(config,metadata,defaultIcon,className='card-icon') {
+    const resolved=resolveMedia(config,metadata,defaultIcon),holder=document.createElement('span');
+    holder.className='busch-media '+className;holder.setAttribute('aria-hidden','true');let index=0;
+    const next=()=>{
+      if (index>=resolved.images.length) {const icon=ha.icon(resolved.icon);holder.replaceChildren(icon);return;}
+      const img=document.createElement('img');img.setAttribute('src',resolved.images[index++]);img.setAttribute('alt','');img.setAttribute('loading','lazy');
+      img.addEventListener('error',next,{once:true});holder.replaceChildren(img);
+    };
+    next();return holder;
+  }
+  function statusSemantic(status) {
+    return ({success:'success',running:'success',online:'success',connected:'success',on:'success',idle:'warning',warning:'warning',partial:'warning',starting:'warning',stopping:'warning',paused:'warning',blocked:'warning',suspended:'warning',error:'error',failed:'error',neutral:'neutral',stopped:'neutral',offline:'neutral',disconnected:'neutral',off:'neutral',unavailable:'unavailable',unknown:'unknown'})[status]||'unknown';
+  }
+  function statusBadge(status,text,classPrefix='status-') {
+    const badge=document.createElement('span');badge.className='status-badge '+classPrefix+statusSemantic(status);badge.textContent=text;return badge;
+  }
+  function formatNumber(value,locale,options={maximumFractionDigits:1}) {
+    return !['number','string'].includes(typeof value)||(typeof value==='string'&&!value.trim())||!Number.isFinite(Number(value))?null:new Intl.NumberFormat(locale||'en',options).format(Number(value));
+  }
+  function metric(label,value,ratio) {
+    const node=document.createElement('div');node.className='metric';
+    const caption=document.createElement('span');caption.className='metric-label';caption.textContent=label;
+    const text=document.createElement('strong');text.className='metric-value';text.textContent=value;node.appendChild(caption);node.appendChild(text);
+    if (ratio!==undefined&&Number.isFinite(ratio)) {const bar=document.createElement('progress');bar.max=100;bar.value=Math.min(100,Math.max(0,ratio*100));bar.setAttribute('aria-label',label);node.appendChild(bar);}return node;
+  }
+  let helperPromise=null;
+  const ha = {
+    form() {
+      const form=document.createElement('ha-form');
+      // HA lazy-loads ha-form. Retain its real selector contract and replay
+      // properties after upgrade; a free-text replacement would lose selectors.
+      if (typeof customElements!=='undefined' && customElements.get && !customElements.get('ha-form') && customElements.whenDefined) {
+        customElements.whenDefined('ha-form').then(()=>{
+          const props=['hass','schema','data','computeLabel','computeHelper','computeError','disabled'].filter(key=>Object.hasOwn(form,key)).map(key=>[key,form[key]]);
+          for (const [key] of props) delete form[key];
+          customElements.upgrade?.(form);
+          for (const [key,value] of props) form[key]=value;
+        });
+      }
+      return form;
+    },
+    input({native=false}={}) {return document.createElement(!native&&typeof customElements!=='undefined'&&customElements.get?.('ha-input')?'ha-input':'input');},
+    icon(name) {const icon=document.createElement('ha-icon');icon.setAttribute('icon',name);return icon;},
+    async cardHelpers() {
+      if (helperPromise) return helperPromise;
+      if (typeof window==='undefined'||typeof window.loadCardHelpers!=='function') return null;
+      helperPromise=Promise.resolve().then(()=>window.loadCardHelpers()).then(helpers=>helpers&&typeof helpers.createCardElement==='function'?helpers:null).catch(()=>null);
+      const helpers=await helperPromise;if (!helpers) helperPromise=null;return helpers;
+    },
+  };
+  const tokens=Object.freeze({space1:'var(--ha-space-1, 4px)',space2:'var(--ha-space-2, 8px)',space3:'var(--ha-space-3, 12px)',space4:'var(--ha-space-4, 16px)',mediaRadius:'var(--ha-card-border-radius, 12px)',controlMinHeight:'44px'});
+  const language=hass=>String(hass?.locale?.language||(typeof navigator!=='undefined'?navigator.language:'en')).startsWith('de')?'de':'en';
+  return Object.freeze({sourceVersion,EditorBase,cloneConfig,configsEqual,updateConfig,updateConfigPath,deleteConfigPath,emitConfigChanged,guardEditorKeys,createEchoState,queueEcho,acceptEcho,resolveMedia,media,statusSemantic,statusBadge,metric,formatNumber,ha,tokens,language});
+})();
+/* END BUSCH SHARED UI */
+
 /**
  * arrstack Cards — Lovelace-Karten zur Integration `arrstack`.
  *
@@ -577,7 +706,7 @@ const ARRSTACK_TOKENS = `
     --arr-space-1: var(--ha-space-1, 4px);
     --arr-space-2: var(--ha-space-2, 8px);
     --arr-space-3: var(--ha-space-3, 12px);
-    --arr-space-4: var(--ha-space-4, 16px);
+    --arr-space-4: ${BuschUI.tokens.space4};
     --arr-radius-1: 6px;
     --arr-radius-2: var(--ha-card-border-radius, 12px);
     --arr-font-sm: var(--ha-font-size-s, 0.8125rem);
@@ -1321,21 +1450,21 @@ function queueStatusText(item, t) {
 function queueTone(item) {
   const tracked = String(item.tracked_state || "").toLowerCase();
   const status = String(item.status || "").toLowerCase();
-  if (["failed", "failedpending", "importblocked"].includes(tracked) || status === "failed") return "error";
-  if (tracked === "importpending" || ["warning", "delay"].includes(status)) return "warning";
-  if (status.includes("unavailable")) return "unavailable";
-  if (["downloading", "running", "completed"].includes(status) || ["importing", "imported"].includes(tracked)) return "success";
-  if (["queued", "paused", "idle"].includes(status)) return "neutral";
-  return "unknown";
+  if (["failed", "failedpending", "importblocked"].includes(tracked) || status === "failed") return BuschUI.statusSemantic("error");
+  if (tracked === "importpending" || ["warning", "delay"].includes(status)) return BuschUI.statusSemantic("warning");
+  if (status.includes("unavailable")) return BuschUI.statusSemantic("unavailable");
+  if (["downloading", "running", "completed"].includes(status) || ["importing", "imported"].includes(tracked)) return BuschUI.statusSemantic("success");
+  if (["queued", "paused", "idle"].includes(status)) return BuschUI.statusSemantic("neutral");
+  return BuschUI.statusSemantic("unknown");
 }
 
 function seerTone(status) {
   const value = String(status || "").toLowerCase();
-  if (value === "available") return "success";
-  if (value === "partially_available" || value === "processing") return "warning";
-  if (value === "blocklisted") return "error";
-  if (value === "pending" || value === "deleted") return "neutral";
-  return "unknown";
+  if (value === "available") return BuschUI.statusSemantic("success");
+  if (value === "partially_available" || value === "processing") return BuschUI.statusSemantic("warning");
+  if (value === "blocklisted") return BuschUI.statusSemantic("error");
+  if (value === "pending" || value === "deleted") return BuschUI.statusSemantic("neutral");
+  return BuschUI.statusSemantic("unknown");
 }
 
 /** Platzhalter der Form `{n}` füllen. */
@@ -1365,7 +1494,7 @@ function formatBytes(bytes, t) {
   const scaled = value / 1024 ** exponent;
   const digits = scaled >= 100 || exponent === 0 ? 0 : 1;
   // Deutsches Zahlenformat: 5,1 GB, nicht 5.1 GB.
-  const text = scaled.toLocaleString(t.zahlformat, {
+  const text = BuschUI.formatNumber(scaled,t.zahlformat, {
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
   });
@@ -1399,6 +1528,7 @@ function formatSince(value, t) {
 
 /** Poster oder ersatzweise ein Symbol — nie ein kaputtes Bild. */
 function posterMarkup(url, brand = null, icon = "film") {
+  url=BuschUI.resolveMedia({display_mode:'image',image:url},{},'mdi:movie').image;
   const symbol = serviceSymbol(brand, icon, 24);
   if (!url) {
     return `<div class="poster poster-fallback">${symbol}</div>`;
@@ -1411,24 +1541,9 @@ function posterMarkup(url, brand = null, icon = "film") {
 /* ── Editor: eine Instanz auswählen ─────────────────────────────────────── */
 
 /** Lovelace-Konfigurationen sind JSON-Werte; interne und externe Daten trennen. */
-function cloneEditorValue(value) {
-  if (Array.isArray(value)) return value.map(cloneEditorValue);
-  if (value && typeof value === "object") {
-    return Object.fromEntries(
-      Object.entries(value).map(([key, entry]) => [key, cloneEditorValue(entry)])
-    );
-  }
-  return value;
-}
+function cloneEditorValue(value){return BuschUI.cloneConfig(value);}
 
-function editorValuesEqual(a, b) {
-  if (Object.is(a, b)) return true;
-  if (!a || !b || typeof a !== "object" || typeof b !== "object" ||
-      Array.isArray(a) !== Array.isArray(b)) return false;
-  const keys = Object.keys(a);
-  return keys.length === Object.keys(b).length &&
-    keys.every((key) => Object.hasOwn(b, key) && editorValuesEqual(a[key], b[key]));
-}
+function editorValuesEqual(a,b){return BuschUI.configsEqual(a,b);}
 
 /** Gemeinsamer Editor. Die Auswahl kommt aus `arrstack/instances`.
  *
@@ -1438,20 +1553,16 @@ function editorValuesEqual(a, b) {
  * Label und Helper stammen aus dem Wörterbuch der jeweiligen Karte; die
  * Sprache aus `hass.locale.language`.
  */
-class ArrstackCardEditor extends HTMLElement {
+class ArrstackCardEditor extends BuschUI.EditorBase {
   constructor() {
     super();
     this._instances = null;
     this._services = ["sonarr", "radarr", "sabnzbd", "seerr"];
     this._basisSchema = [];
     this._woerterbuch = null;
-    this._pendingConfigs = [];
-    this._receivedConfigs = new Set();
-    this._staleConfigs = [];
+    this._echoState = BuschUI.createEchoState();
     // HA-Dashboard-Shortcuts dürfen beim Tippen im Editor nicht mitlaufen.
     // Die Standardaktion (Zeichen eingeben, Auswahl bedienen) bleibt erhalten.
-    this.addEventListener("keydown", (event) => event.stopPropagation());
-    this.addEventListener("keyup", (event) => event.stopPropagation());
   }
 
   /** Von den Unterklassen gesetzt: Dienste, Schema und Wörterbuch. */
@@ -1468,36 +1579,7 @@ class ArrstackCardEditor extends HTMLElement {
 
   setConfig(config) {
     const next = cloneEditorValue(config || {});
-    // Gleiche Werte können mehrfach editiert worden sein. Ohne Echo-ID aus HA
-    // ordnen wir sie der frühesten noch offenen passenden Position zu.
-    const pending = this._pendingConfigs.findIndex((value) =>
-      !this._receivedConfigs.has(value) && editorValuesEqual(value, next));
-    if (pending !== -1) {
-      // Ein älteres HA-Echo darf neuere, noch nicht bestätigte Eingaben nicht löschen.
-      if (pending < this._pendingConfigs.length - 1) {
-        this._receivedConfigs.add(this._pendingConfigs[pending]);
-        return;
-      }
-      // Nur noch ausstehende ältere Echos können nach dem neuesten eintreffen.
-      this._staleConfigs.push(...this._pendingConfigs.slice(0, -1)
-        .filter((value) => !this._receivedConfigs.has(value)));
-      this._pendingConfigs = [];
-      this._receivedConfigs.clear();
-    } else {
-      // Wiederholte Echos eines bestätigten oder aktuellen Werts dürfen noch
-      // ausstehende ältere Echos nicht aus der Warteliste entfernen.
-      if (editorValuesEqual(this._config, next) || this._pendingConfigs.some((value) =>
-        this._receivedConfigs.has(value) && editorValuesEqual(value, next))) return;
-      const stale = this._staleConfigs.findIndex((value) => editorValuesEqual(value, next));
-      if (stale !== -1) {
-        this._staleConfigs.splice(stale, 1);
-        return;
-      }
-      this._pendingConfigs = [];
-      this._receivedConfigs.clear();
-      this._staleConfigs = [];
-    }
-    if (editorValuesEqual(this._config, next)) return;
+    if (!BuschUI.acceptEcho(this._echoState,next,this._config)) return;
     this._config = next;
     this._render();
   }
@@ -1556,7 +1638,7 @@ class ArrstackCardEditor extends HTMLElement {
   _render() {
     if (!this._hass || !this._config) return;
     if (!this._form) {
-      this._form = document.createElement("ha-form");
+      this._form = BuschUI.ha.form();
       this._form.computeLabel = (schema) => {
         const wb = this._woerterbuch[this._sprache()];
         return wb.labels[schema.name] || schema.name;
@@ -1568,17 +1650,11 @@ class ArrstackCardEditor extends HTMLElement {
       this._form.addEventListener("value-changed", (event) => {
         event.stopPropagation();
         this._config = { ...this._config, ...cloneEditorValue(event.detail.value || {}) };
-        this._pendingConfigs.push(this._config);
+        BuschUI.queueEcho(this._echoState,this._config);
         // ha-form besitzt den gerade editierten Zustand bereits. Kein
         // data-Reset während einer Tastatureingabe oder beim HA-Echo.
         this._renderedConfig = this._config;
-        this.dispatchEvent(
-          new CustomEvent("config-changed", {
-            detail: { config: cloneEditorValue(this._config) },
-            bubbles: true,
-            composed: true,
-          })
-        );
+        BuschUI.emitConfigChanged(this,this._config);
       });
       this.appendChild(this._form);
     }

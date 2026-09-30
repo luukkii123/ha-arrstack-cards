@@ -231,3 +231,22 @@ ein echter HA-Editor und ein Speichervorgang sind damit nicht nachgewiesen.
 ## Lizenz
 
 MIT
+
+### Gemeinsame UI-Quelle 0.2.0 – lokal geprüft am 30.09.2026
+
+Das eigenständige Bundle enthält die physische Vanilla-JS-Quelle der lokalen
+HACS-Verwaltung (`shared-ui/busch-ui.js`) identisch mit Versions-/SHA256-
+Markern. Die gemeinsame Editorbasis, Config-/Event-/Keyboardhelper und
+HA-Adapter werden im Produktpfad verwendet; Media/Status/Metrics und
+HA-Spaces bleiben fachlich passend im vorhandenen Layout. Kein npm, Build,
+Cross-Repo-Laufzeitimport oder zusätzlicher Karten-Core. HACS-Version
+unverändert; dieser Stand wurde weder veröffentlicht noch installiert.
+
+Native Komponenten-/Adaptermatrix auf HA 2026.9.3 und 2026.9.4: alle
+Editoren gemeinsam mit den anderen drei unabhängigen Bundles geladen,
+physische Texteingabe, vollständige Config, false/0/readonly/Echo/Fokus
+und Keyboardguard geprüft. Je Version 15 Editoren × 6 Breiten-/Themefälle
+(320/480/960, hell/dunkel), null Überlauf/Seitenfehler/Rejections.
+Bestehende lokale Karten-/Editorproben ebenfalls grün; Laufartefakte privat.
+Diese lesende Probe ergänzt die bisherigen Speicherrundläufe; sie ist kein
+neuer vollständiger Visual/YAML-/Save-Reopen-/Portal-/IME-Gesamtnachweis.
