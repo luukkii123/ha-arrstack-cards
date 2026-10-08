@@ -291,7 +291,7 @@ Speichern und Wiederöffnen; lokale Suiten und Darstellungsmatrizen sind oben
 dokumentiert. Der vorhandene native Pickerkonflikt bleibt eine benannte Grenze.
 Keine produktiven Geräteaktionen wurden für die Abnahme ausgeführt.
 
-### Lokal geprüft am 08.10.2026 · Kandidat 0.5.0 (unveröffentlicht)
+### Geprüft — 08.10.2026 · 0.5.0
 
 Seer zeigt kompakte Treffer mit tatsächlichen Staffeln direkt im Ergebnis, klaren Fehlern und
 Retry; technische Details bleiben eingeklappt. Sonarr/Radarr nutzen dieselben
@@ -314,4 +314,4 @@ Chromium prüfte 320/390/480/960 px in Hell/Dunkel sowie denselben Kandidaten
 browserlokal im echten HA-Frontend mit synthetischen Medienantworten und
 Schreibsperre. Die [26-Regel-Matrix](docs/design-audit-2026-10-08-arrcompact.md)
 nennt Belege und die verbleibenden Host-/Screenreader-/Zoom-/Feldmessgrenzen.
-Dies ist keine veröffentlichte oder installierte Version.
+Veröffentlichung und tatsächlich installierter Stand werden separat geprüft.
