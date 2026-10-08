@@ -19,8 +19,8 @@ from playwright.sync_api import sync_playwright
 out = pathlib.Path(sys.argv[1]).resolve()
 record = "--record" in sys.argv[2:]
 baseline = pathlib.Path(__file__).parent / "baselines" / "ui-0.1.0"
-files = [f"alle-{width}-{theme}.png" for width in (320, 480, 960) for theme in ("light", "dark")]
-files += [f"editoren-{width}-{theme}.png" for width in (320, 480, 960) for theme in ("light", "dark")]
+files = [f"alle-{width}-{theme}.png" for width in (320, 390, 480, 960) for theme in ("light", "dark")]
+files += [f"editoren-{width}-{theme}.png" for width in (320, 390, 480, 960) for theme in ("light", "dark")]
 
 
 class Handler(http.server.SimpleHTTPRequestHandler):
@@ -52,7 +52,7 @@ try:
           const wrap=document.getElementById('wrap');wrap.style.maxWidth='none';wrap.style.width='auto';
         }""")
         page.wait_for_timeout(200)
-        for width in (320, 480, 960):
+        for width in (320, 390, 480, 960):
             for theme in ("light", "dark"):
                 page.set_viewport_size({"width": width, "height": 1200})
                 page.evaluate("theme => document.documentElement.dataset.theme=theme", theme)
@@ -220,7 +220,7 @@ try:
           }
         }""")
         page.wait_for_timeout(100)
-        for width in (320, 480, 960):
+        for width in (320, 390, 480, 960):
             for theme in ("light", "dark"):
                 page.set_viewport_size({"width": width, "height": 1200})
                 page.evaluate("theme => document.documentElement.dataset.theme=theme", theme)
@@ -257,7 +257,7 @@ try:
                 if (metrics["pageWidth"] > width or not metrics["within"] or metrics["collides"]
                         or metrics["textOverflow"] or not metrics["helpers"]
                         or metrics["minimumHeight"] < 44 or metrics["outline"] == "none"
-                        or metrics["fields"] != 20 or min(metrics["options"]) < 2):
+                        or metrics["fields"] != 21 or min(metrics["options"]) < 2):
                     findings.append(f"Editoren {width}/{theme}: {metrics}")
         browser.close()
 finally:

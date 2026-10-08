@@ -230,7 +230,7 @@ const BuschUI = (() => {
  *  - Regel 4: Farben, Abstände und Schriftgrößen nur über Theme-Variablen.
  */
 
-const CARD_VERSION = "0.4.1";
+const CARD_VERSION = "0.5.0";
 
 const DOCS_URL = "https://github.com/luukkii123/ha-arrstack-cards";
 
@@ -316,7 +316,7 @@ const BRAND_BASE = "https://brands.home-assistant.io/_/";
  * Kennung, und hier steht dann ein eigenes Zeichen.
  */
 function serviceSymbol(brand, fallback = "inbox", size = 22) {
-  return brand
+  return brand && brand !== "seerr"
     ? `<span class="symbol-pair">${serviceLogo(brand, size)}<span hidden>${arrIcon(fallback, size)}</span></span>`
     : arrIcon(fallback, size);
 }
@@ -352,6 +352,19 @@ function arrIcon(name, size = 18) {
  */
 const TEXTE_ARRSTACK_BASIS = {
   de: {
+    treffer: '{n} Treffer',
+    vorherige: 'Zurück',
+    naechste: 'Weiter',
+    seite: 'Seite {n} von {total}',
+    bereit: 'Bereit',
+    erneut: 'Erneut versuchen',
+    details: 'Technische Details',
+    fehler_kurz: 'Die Anfrage konnte nicht verarbeitet werden. Eingaben bleiben erhalten. Bitte erneut versuchen.',
+    fehler_suche: 'Suche fehlgeschlagen',
+    aenderungen: 'Auswahl verwerfen?',
+    aenderungen_hinweis: 'Die geänderte Auswahl bleibt erhalten, bis du sie ausdrücklich verwirfst.',
+    verwerfen: 'Verwerfen',
+    behalten: 'Weiter bearbeiten',
     laden: "Lade …",
     schliessen: "Schließen",
     abbrechen: "Abbrechen",
@@ -400,6 +413,19 @@ const TEXTE_ARRSTACK_BASIS = {
     },
   },
   en: {
+    treffer: '{n} results',
+    vorherige: 'Previous',
+    naechste: 'Next',
+    seite: 'Page {n} of {total}',
+    bereit: 'Ready',
+    erneut: 'Retry',
+    details: 'Technical details',
+    fehler_kurz: 'The request could not be processed. Your input is kept. Please retry.',
+    fehler_suche: 'Search failed',
+    aenderungen: 'Discard selection?',
+    aenderungen_hinweis: 'Your changed selection is kept until you explicitly discard it.',
+    verwerfen: 'Discard',
+    behalten: 'Keep editing',
     laden: "Loading …",
     schliessen: "Close",
     abbrechen: "Cancel",
@@ -579,6 +605,7 @@ const SCHEMA_ARRSTACK_FIX_CARD = [
   { name: "entry_id", selector: { select: { options: [], mode: "dropdown", custom_value: false } } },
   { name: "service", selector: { select: { options: [], mode: "dropdown", custom_value: false } } },
   { name: "refresh_seconds", selector: { number: { min: 0, max: 600, mode: "box", unit_of_measurement: "s" } } },
+  { name: "max_items", selector: { number: { min: 1, max: 50, mode: "box" } } },
 ];
 
 const TEXTE_ARRSTACK_FIX_CARD = {
@@ -586,20 +613,36 @@ const TEXTE_ARRSTACK_FIX_CARD = {
     name: "arrstack Import-Fix",
     description: "Heruntergeladen, aber nicht importiert — mit Schnell-Reparatur.",
     labels: {
+      max_items: 'Einträge pro Seite',
       title: "Überschrift",
       entry_id: "Instanz",
       service: "Dienst",
       refresh_seconds: "Neu laden alle",
     },
     helpers: {
-      title: "Überschrift der Karte. Vorgabe: Nicht importiert.",
+      max_items: 'Wie viele Queue-Einträge eine Seite zeigt. Vorgabe 5. Weiterblättern erhält die Auswahl.',
+      title: "Überschrift der Karte. Vorgabe: Import / Probleme.",
       entry_id: "Welche eingerichtete arrstack-Instanz die Karte abfragt. Vorgabe: die einzige passende.",
       service: "Diensttyp, wenn keine Instanz gewählt ist. Vorgabe: die Integration entscheidet.",
       refresh_seconds: "Sekunden zwischen zwei Abfragen. 0 schaltet das Nachladen ab. Vorgabe 60.",
     },
     texte: {
       ...TEXTE_ARRSTACK_BASIS.de,
-      kartentitel: "Nicht importiert",
+      eine_datei: '1 Datei gefunden',
+      auswahl_noetig: 'Auswahl nötig',
+      bulk: 'Bereite importieren',
+      auswahl_importieren: 'Auswahl importieren',
+      ausgewaehlt: '{n} ausgewählt',
+      uebermittelt: '{n} Importauftrag/-aufträge übermittelt.',
+      teilfehler: '{n} Eintrag/Einträge fehlgeschlagen. Bitte Details prüfen.',
+      uebersprungen: '{n} Eintrag/Einträge nicht importiert. Aktuellen Status prüfen.',
+      import_fehler: 'Import fehlgeschlagen',
+      import_status: 'Importprüfung fehlgeschlagen',
+      auswahl_datei: 'Datei auswählen',
+      datei_ungueltig: 'Nicht importierbar',
+      keine_importe: 'Keine bereiten Einträge.',
+      neu_laden: 'Aktualisieren',
+      kartentitel: "Import / Probleme",
       leer: "Alles importiert.",
       offen: "{n} offen",
       pruefen: "Prüfen",
@@ -623,20 +666,36 @@ const TEXTE_ARRSTACK_FIX_CARD = {
     name: "arrstack import fix",
     description: "Downloaded but never imported — with a one-click repair.",
     labels: {
+      max_items: 'Items per page',
       title: "Title",
       entry_id: "Instance",
       service: "Service",
       refresh_seconds: "Reload every",
     },
     helpers: {
-      title: "Heading of the card. Default: Not imported.",
+      max_items: 'How many queue items one page shows. Default 5. Paging keeps the selection.',
+      title: "Heading of the card. Default: Import / problems.",
       entry_id: "Which configured arrstack instance the card queries. Default: the only matching one.",
       service: "Service type when no instance is picked. Default: the integration decides.",
       refresh_seconds: "Seconds between two queries. 0 turns reloading off. Default 60.",
     },
     texte: {
       ...TEXTE_ARRSTACK_BASIS.en,
-      kartentitel: "Not imported",
+      eine_datei: '1 file found',
+      auswahl_noetig: 'Selection required',
+      bulk: 'Import ready',
+      auswahl_importieren: 'Import selected',
+      ausgewaehlt: '{n} selected',
+      uebermittelt: '{n} import command(s) submitted.',
+      teilfehler: '{n} item(s) failed. Please check details.',
+      uebersprungen: '{n} item(s) were not imported. Check the current status.',
+      import_fehler: 'Import failed',
+      import_status: 'Import inspection failed',
+      auswahl_datei: 'Select file',
+      datei_ungueltig: 'Not importable',
+      keine_importe: 'No ready items.',
+      neu_laden: 'Refresh',
+      kartentitel: "Import / problems",
       leer: "Everything imported.",
       offen: "{n} open",
       pruefen: "Check",
@@ -680,7 +739,7 @@ const TEXTE_ARRSTACK_SEER_CARD = {
       max_items: "Einträge",
     },
     helpers: {
-      title: "Überschrift der Karte. Vorgabe: Anfragen.",
+      title: "Überschrift der Karte. Vorgabe: Seer.",
       entry_id: "Welche eingerichtete arrstack-Instanz die Karte abfragt. Vorgabe: die einzige passende.",
       service: "Diensttyp, wenn keine Instanz gewählt ist. Vorgabe: die Integration entscheidet.",
       refresh_seconds: "Sekunden zwischen zwei Abfragen. 0 schaltet das Nachladen ab. Vorgabe 0 — die Karte lädt auf Zuruf.",
@@ -688,7 +747,7 @@ const TEXTE_ARRSTACK_SEER_CARD = {
     },
     texte: {
       ...TEXTE_ARRSTACK_BASIS.de,
-      kartentitel: "Anfragen",
+      kartentitel: "Seer",
       platzhalter: "Serie oder Film suchen",
       suchbegriff: "Suchbegriff",
       suchen: "Suchen",
@@ -725,7 +784,7 @@ const TEXTE_ARRSTACK_SEER_CARD = {
       max_items: "Entries",
     },
     helpers: {
-      title: "Heading of the card. Default: Requests.",
+      title: "Heading of the card. Default: Seer.",
       entry_id: "Which configured arrstack instance the card queries. Default: the only matching one.",
       service: "Service type when no instance is picked. Default: the integration decides.",
       refresh_seconds: "Seconds between two queries. 0 turns reloading off. Default 0 — this card loads on demand.",
@@ -733,7 +792,7 @@ const TEXTE_ARRSTACK_SEER_CARD = {
     },
     texte: {
       ...TEXTE_ARRSTACK_BASIS.en,
-      kartentitel: "Requests",
+      kartentitel: "Seer",
       platzhalter: "Search a show or movie",
       suchbegriff: "Search term",
       suchen: "Search",
@@ -1082,6 +1141,38 @@ const ARRSTACK_STYLES = BuschUI.cardStyles + ARRSTACK_TOKENS + ARRSTACK_EINZEILI
   }
 `;
 
+/** Compact request/import variants preserve the shared dashboard shell. */
+const ARRSTACK_COMPACT = `
+  .head { margin-bottom: var(--arr-space-3); }
+  .title { font-size: var(--arr-font-md); }
+  .status-badge, .status-badge.success, .status-badge.warning, .status-badge.error,
+  .notice, .notice.problem, details summary, button.quiet { color: var(--arr-text); }
+  .head-media { width: 44px; height: 44px; }
+  .empty { padding: var(--arr-space-2) 0; align-items: flex-start; text-align: start; }
+  .empty > .icon { display: none; }
+  .poster { width: var(--arr-thumb); height: calc(var(--arr-thumb) * 1.5); }
+  .row.result { display: grid; grid-template-columns: auto minmax(0,1fr); gap: var(--arr-space-2); }
+  .row.result > .status-badge { grid-column: 2; justify-self: start; margin-top: calc(-1 * var(--arr-space-2)); }
+  .import-row { display: grid; grid-template-columns: auto minmax(0,1fr); gap: var(--arr-space-2); }
+  .import-row > .actions { grid-column: 2; width: auto; }
+  .import-row .status-badge { margin-top: var(--arr-space-2); white-space: normal; overflow-wrap: anywhere; }
+  .import-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--arr-space-2); margin: var(--arr-space-3) 0; }
+  .select-label { display: inline-flex; align-items: center; gap: var(--arr-space-2); min-height: 44px; cursor: pointer; }
+  input[type=checkbox], input[type=radio] { accent-color: var(--arr-accent); }
+  details:not([open]) > :not(summary) { display: none; }
+  .select-label > .dlg-text { display: block; min-width: 0; }
+  .candidate + .candidate { margin-top: var(--arr-space-3); }
+  details { overflow-wrap: anywhere; min-width: 0; font-size: var(--arr-font-sm); }
+  summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; color: var(--arr-muted); }
+  pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; user-select: text; }
+  @container (max-width: 440px) {
+    .head { grid-template-columns: minmax(0,1fr) auto; }
+    .head-meta { grid-column: auto; margin-inline-start: 0; }
+    .row.result { flex-wrap: nowrap; }
+  }
+  @media (prefers-reduced-motion: reduce) { .bar > i { transition: none; } }
+`;
+
 /* ═══════════════════════════════════════════════════════════════════════════
  * Dialog (Regel 2)
  *
@@ -1102,7 +1193,7 @@ const ARRSTACK_STYLES = BuschUI.cardStyles + ARRSTACK_TOKENS + ARRSTACK_EINZEILI
 
 const DIALOG_TAG = "arrstack-dialog";
 
-const DIALOG_STYLES = ARRSTACK_TOKENS + ARRSTACK_EINZEILIG + ARRSTACK_GEMEINSAM + `
+const DIALOG_STYLES = ARRSTACK_TOKENS + ARRSTACK_EINZEILIG + ARRSTACK_GEMEINSAM + ARRSTACK_COMPACT + `
   :host {
     position: fixed;
     inset: 0;
@@ -1233,18 +1324,20 @@ class ArrstackDialog extends HTMLElement {
     this._closing = false;
     this._closed = false;
     this._onKey = (event) => {
-      if (event.key !== "Escape") return;
-      event.stopPropagation();
-      this.close();
+      if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); this.close(); }
+      if (event.key === "Tab") {
+        const buttons = this._focusables();
+        if (!buttons.length) { event.preventDefault(); return; }
+        const index = buttons.indexOf(this.shadowRoot.activeElement);
+        if ((event.shiftKey && index <= 0) || (!event.shiftKey && index === buttons.length - 1)) {
+          event.preventDefault(); buttons[event.shiftKey ? buttons.length - 1 : 0].focus();
+        }
+      }
     };
     this._onPop = () => {
-      if (this._closing) {
-        this._closing = false;
-        this._dismiss();
-        return;
-      }
-      // Der eigene Eintrag ist verschwunden — also die Zurück-Taste.
+      if (this._closing) { this._closing = false; this._dismiss(); return; }
       this._pushed = false;
+      if (this._blocked()) { this._push(); this._confirmDiscard(); return; }
       this._dismiss();
     };
   }
@@ -1255,14 +1348,26 @@ class ArrstackDialog extends HTMLElement {
   }
 
   connectedCallback() {
-    document.addEventListener("keydown", this._onKey);
+    this._returnFocus = document.activeElement;
+    while (this._returnFocus?.shadowRoot?.activeElement) this._returnFocus = this._returnFocus.shadowRoot.activeElement;
+    const originRoot = this._returnFocus?.getRootNode();
+    this._returnRoot = originRoot?.host ? originRoot : null;
+    const originRow = this._returnFocus?.closest?.('[data-index],[data-item]');
+    this._returnSelector = originRow?.dataset.index != null ? `[data-index="${originRow.dataset.index}"]` :
+      originRow?.dataset.item != null ? `[data-item="${originRow.dataset.item}"] button` : '.go';
+    this._background = [...document.body.children].filter(node => node !== this).map(node => [node, node.inert]);
+    this._background.forEach(([node]) => { node.inert = true; });
+    document.addEventListener("keydown", this._onKey, true);
     window.addEventListener("popstate", this._onPop);
     this._push();
     this._render();
   }
 
   disconnectedCallback() {
-    document.removeEventListener("keydown", this._onKey);
+    document.removeEventListener("keydown", this._onKey, true);
+    this._background?.forEach(([node, inert]) => { node.inert = inert; });
+    if (this._returnFocus?.isConnected) this._returnFocus.focus();
+    else this._returnRoot?.querySelector(this._returnSelector)?.focus();
     window.removeEventListener("popstate", this._onPop);
   }
 
@@ -1279,7 +1384,21 @@ class ArrstackDialog extends HTMLElement {
   }
 
   /** Schließen über Knopf, Escape oder Scrim — ohne verwaisten Eintrag. */
-  close() {
+  _focusables() {
+    return [...this.shadowRoot.querySelectorAll('button,input,summary,[tabindex="0"]')]
+      .filter(node => !node.disabled && node.getClientRects().length);
+  }
+
+  _blocked() { return this._model?.busy?.() || this._model?.dirty?.(); }
+
+  _confirmDiscard() {
+    if (this._model?.busy?.()) return;
+    this._discardPrompt = true;
+    this._render();
+  }
+
+  close(force = false) {
+    if (!force && this._blocked()) { this._confirmDiscard(); return; }
     if (this._pushed) {
       this._pushed = false;
       this._closing = true;
@@ -1308,7 +1427,12 @@ class ArrstackDialog extends HTMLElement {
   _render() {
     const model = this._model;
     if (!model) return;
-    const aktionen = model.aktionen || [];
+    const active = this.shadowRoot.activeElement;
+    const focusKey = active?.dataset?.season ?? active?.dataset?.candidate ?? active?.dataset?.akt;
+    const aktionen = this._discardPrompt ? [
+      {id:"keep",text:model.texte.behalten,art:"quiet"},
+      {id:"discard",text:model.texte.verwerfen,art:"primary"}
+    ] : model.aktionen || [];
     this.shadowRoot.innerHTML = `<style>${DIALOG_STYLES}</style>
       <div class="scrim"></div>
       <div class="sheet ${model.schmal ? "schmal" : ""}" role="dialog" aria-modal="true"
@@ -1318,7 +1442,9 @@ class ArrstackDialog extends HTMLElement {
             title="${escapeHtml(model.schliessen)}">${arrIcon("close", 20)}</button>
           <div class="dlg-title">${escapeHtml(model.titel)}</div>
         </div>
-        <div class="dlg-body">${model.koerper()}</div>
+        <div class="dlg-body">${this._discardPrompt
+          ? `<div class="dlg-text">${escapeHtml(model.texte.aenderungen_hinweis)}</div>`
+          : model.koerper()}</div>
         ${
           aktionen.length
             ? `<div class="dlg-foot">${aktionen
@@ -1333,16 +1459,23 @@ class ArrstackDialog extends HTMLElement {
             : ""
         }
       </div>`;
-    this.shadowRoot.querySelector(".scrim").addEventListener("click", () => this.close());
+    // R04: actionable dialogs never dismiss through the backdrop.
+    this.shadowRoot.querySelector(".scrim").addEventListener("click", event => event.stopPropagation());
     this.shadowRoot
       .querySelector(".dlg-close")
       .addEventListener("click", () => this.close());
     this.shadowRoot.querySelectorAll(".dlg-foot button").forEach((knopf) => {
       knopf.addEventListener("click", () => {
-        if (model.beiAktion) model.beiAktion(knopf.dataset.akt, this);
+        const id = knopf.dataset.akt;
+        if (id === "keep") { this._discardPrompt = false; this._render(); return; }
+        if (id === "discard") { this.close(true); return; }
+        if (model.beiAktion) model.beiAktion(id, this);
       });
     });
-    if (model.binden) model.binden(this.shadowRoot, this);
+    if (model.binden && !this._discardPrompt) model.binden(this.shadowRoot, this);
+    const candidates = this._focusables();
+    const previous = candidates.find(node => [node.dataset.season,node.dataset.candidate,node.dataset.akt].includes(focusKey));
+    (previous || candidates[0])?.focus();
   }
 }
 
@@ -1442,7 +1575,7 @@ class ArrstackCardBase extends HTMLElement {
   /** Genau ein Dialog je Karte; ein zweiter würde den Verlauf verschachteln. */
   _oeffneDialog(model) {
     this._schliesseDialog();
-    const eigen = { ...model };
+    const eigen = { texte: this._t(), ...model };
     const weiter = model.beimSchliessen;
     eigen.beimSchliessen = () => {
       this._dialog = null;
@@ -1479,6 +1612,15 @@ class ArrstackCardBase extends HTMLElement {
     return (error && error.message) || t.fehler_allgemein;
   }
 
+  _errorMarkup(error, heading, retry = true) {
+    const t = this._t();
+    const known = ["not_found","ambiguous_instance","unsupported_service","unauthorized"].includes(error?.code);
+    return `<div class="notice problem" role="alert"><div>${escapeHtml(heading || t.fehler_allgemein)}</div>
+      <div>${escapeHtml(known ? this._errorText(error) : t.fehler_kurz)}</div>
+      ${retry ? `<button class="act-retry quiet">${escapeHtml(t.erneut)}</button>` : ""}
+      <details><summary>${escapeHtml(t.details)}</summary><pre>${escapeHtml(error?.message || String(error || ""))}</pre></details></div>`;
+  }
+
   /** Leerzustand als Entwurf, nicht als Restfläche. */
   _empty(icon, text) {
     return `<div class="empty">${arrIcon(icon, 28)}
@@ -1489,7 +1631,7 @@ class ArrstackCardBase extends HTMLElement {
   _head(icon, meta = "", tone = "") {
     const node=document.createElement('div');node.className='head';
     node.innerHTML=`<div class="head-title">
-        <span class="head-media">${serviceSymbol(this._data && this._data.brand, icon, 24)}</span>
+        <span class="head-media">${serviceSymbol(this._data?.brand || this._data?.service || this._config?.service, icon, 24)}</span>
         <span class="title">${escapeHtml(this._titel())}</span>
       </div>
       ${meta ? `<span class="head-meta${tone ? ` status-badge ${tone}` : ""}">${escapeHtml(meta)}</span>` : ""}`;
@@ -1786,6 +1928,7 @@ class ArrstackDownloadsCard extends ArrstackCardBase {
         ${this._head("download", this._headMeta())}
         ${this._body()}
       </ha-card>`;
+    this.shadowRoot.querySelector(".act-retry")?.addEventListener("click",()=>this._load());
   }
 
   _headMeta() {
@@ -1799,7 +1942,7 @@ class ArrstackDownloadsCard extends ArrstackCardBase {
   _body() {
     const t = this._t();
     if (this._error) {
-      return `<div class="notice problem">${escapeHtml(this._errorText(this._error))}</div>`;
+      return this._errorMarkup(this._error,t.fehler_allgemein);
     }
     if (!this._data) {
       return `<div class="notice">${escapeHtml(t.laden)}</div>`;
@@ -1896,12 +2039,13 @@ class ArrstackRecentCard extends ArrstackCardBase {
         ${this._head("download")}
         ${this._body()}
       </ha-card>`;
+    this.shadowRoot.querySelector(".act-retry")?.addEventListener("click",()=>this._load());
   }
 
   _body() {
     const t = this._t();
     if (this._error) {
-      return `<div class="notice problem">${escapeHtml(this._errorText(this._error))}</div>`;
+      return this._errorMarkup(this._error,t.fehler_allgemein);
     }
     if (!this._data) return `<div class="notice">${escapeHtml(t.laden)}</div>`;
     const items = (this._data.items || []).slice(0, Number(this._config.max_items) || 8);
@@ -1940,20 +2084,21 @@ class ArrstackRecentCard extends ArrstackCardBase {
  * heruntergeladene Dateien verschwinden.
  */
 class ArrstackFixCard extends ArrstackCardBase {
-  static get woerterbuch() {
-    return TEXTE_ARRSTACK_FIX_CARD;
+  static get woerterbuch() { return TEXTE_ARRSTACK_FIX_CARD; }
+  static getConfigElement() { return document.createElement("arrstack-fix-card-editor"); }
+  static getStubConfig() { return { type: "custom:arrstack-fix-card", refresh_seconds: 60, max_items: 5 }; }
+  _defaults() { return { refresh_seconds: 60, max_items: 5 }; }
+
+  _titel() {
+    if (this._config?.title) return this._config.title;
+    const service = this._data?.service || this._config?.service;
+    const name = service === "radarr" ? "Radarr" : service === "sonarr" ? "Sonarr" : "";
+    return name ? `${name} · ${this._t().kartentitel}` : this._t().kartentitel;
   }
 
-  static getConfigElement() {
-    return document.createElement("arrstack-fix-card-editor");
-  }
-
-  static getStubConfig() {
-    return { type: "custom:arrstack-fix-card", refresh_seconds: 60 };
-  }
-
-  _defaults() {
-    return { refresh_seconds: 60 };
+  _stateLabel(item) {
+    const t=this._t();
+    return {ready:t.eine_datei,no_match:t.keine_datei,selection_required:t.auswahl_noetig,error:t.import_status}[item.import_state] || queueStatusText(item,t);
   }
 
   constructor() {
@@ -1961,236 +2106,218 @@ class ArrstackFixCard extends ArrstackCardBase {
     this._open = null;
     this._busy = null;
     this._message = null;
+    this._selected = new Set();
+    this._lastSelected = null;
+    this._itemErrors = new Map();
+    this._operationError = null;
+    this._page = 0;
   }
 
   async _load() {
     if (this._loading) return;
     this._loading = true;
     try {
-      this._data = await this._call("arrstack/import_problems");
+      this._data = await this._call("arrstack/refresh_import_queue");
       this._error = null;
-    } catch (error) {
-      this._error = error;
-    } finally {
-      this._loading = false;
-      this._loaded = true;
-      this._render();
-    }
+      const readyIds = new Set((this._data.items || []).filter(item => this._ready(item)).map(item => this._id(item)));
+      this._selected = new Set([...this._selected].filter(id => readyIds.has(id)));
+    } catch (error) { this._error = error; }
+    finally { this._loading = false; this._loaded = true; this._render(); }
   }
+
+  _id(item) { return Number(item.queue_item_id ?? item.id); }
+  _ready(item) {
+    return item.download_complete === true && Number(item.progress) >= 100 &&
+      item.import_state === "ready" && item.candidate_count === 1;
+  }
+  _relevant(item) { return item.download_complete === true && Number(item.progress) >= 100 && item.import_state !== "not_applicable"; }
 
   _render() {
     if (!this._config) return;
     const t = this._t();
-    const items = (this._data && this._data.items) || [];
-    this.shadowRoot.innerHTML = `<style>${ARRSTACK_STYLES}</style>
-      <ha-card>
-        ${this._head("download", items.length ? fuelle(t.offen, { n: items.length }) : "", "warning")}
-        ${this._message ? `<div class="notice">${escapeHtml(this._message)}</div>` : ""}
-        ${this._body(items)}
-      </ha-card>`;
+    const items = this._data?.items || [];
+    const ready = items.filter(item => this._ready(item));
+    const pageSize = Math.max(1,Number(this._config.max_items)||5);
+    const pages = Math.max(1,Math.ceil(items.length/pageSize));
+    this._page = Math.min(this._page,pages-1);
+    const visible = items.slice(this._page*pageSize,(this._page+1)*pageSize);
+    this.shadowRoot.innerHTML = `<style>${ARRSTACK_STYLES}${ARRSTACK_COMPACT}</style><ha-card>
+      ${this._head("download", items.length ? fuelle(t.offen, {n:items.length}) : "", "warning")}
+      ${this._message ? `<div class="notice" role="status">${escapeHtml(this._message)}</div>` : ""}
+      ${this._operationError ? this._errorMarkup(this._operationError,t.import_fehler,false) : ""}
+      ${this._body(visible)}
+      ${pages > 1 ? `<div class="import-toolbar">
+        <button class="act-prev quiet" ${this._page===0 ? "disabled" : ""}>${escapeHtml(t.vorherige)}</button>
+        <span class="chip">${escapeHtml(fuelle(t.seite,{n:this._page+1,total:pages}))}</span>
+        <button class="act-next quiet" ${this._page===pages-1 ? "disabled" : ""}>${escapeHtml(t.naechste)}</button>
+      </div>` : ""}
+      ${items.length ? `<div class="import-toolbar">
+        <button class="act-bulk quiet" ${this._busy || !ready.length ? "disabled" : ""}>${arrIcon("download")}<span class="lbl">${escapeHtml(t.bulk)}</span></button>
+        <button class="act-refresh quiet" ${this._loading || this._busy ? "disabled" : ""}>${escapeHtml(t.neu_laden)}</button>
+        ${this._selected.size ? `<span class="chip">${escapeHtml(fuelle(t.ausgewaehlt,{n:this._selected.size}))}</span><button class="act-selected quiet" ${this._busy ? "disabled" : ""}>${escapeHtml(t.auswahl_importieren)}</button>` : ""}
+      </div>` : ""}</ha-card>`;
     this._bind();
   }
 
   _body(items) {
-    const t = this._t();
-    if (this._error) {
-      return `<div class="notice problem">${escapeHtml(this._errorText(this._error))}</div>`;
-    }
-    if (!this._data) return `<div class="notice">${escapeHtml(t.laden)}</div>`;
-    if (!items.length) {
-      return this._empty("check", t.leer);
-    }
-    return `<div class="rows">${items.map((item) => this._row(item)).join("")}</div>`;
+    if (this._error) return this._errorMarkup(this._error, this._t().import_status);
+    if (!this._data) return `<div class="notice" role="status">${escapeHtml(this._t().laden)}</div>`;
+    if (!items.length) return this._empty("check", this._t().leer);
+    return `<div class="rows">${items.map(item => this._row(item)).join("")}</div>`;
   }
 
   _row(item) {
-    const t = this._t();
-    const reason = (item.messages && item.messages[0]) || item.tracked_state || "";
-    return `<div class="row wrap" data-download="${escapeHtml(item.download_id || "")}"
-        data-item="${escapeHtml(item.id ?? "")}">
-      <div class="thumb warn">${arrIcon("alert", 20)}</div>
+    const t = this._t(), id = this._id(item), complete = this._relevant(item), ready = this._ready(item);
+    const status = complete ? this._stateLabel(item) : queueStatusText(item,t);
+    const problem = this._itemErrors.get(id) || (complete && item.last_error ? {message:item.last_error} : null);
+    return `<div class="row import-row" data-item="${id}">
+      ${posterMarkup(item.poster || item.image)}
       <div class="row-main">
-        <div class="row-title">${escapeHtml(item.parent_title || item.title)}</div>
-        <div class="row-meta">${escapeHtml(reason)}</div>
+        <div class="row-title">${escapeHtml(item.parent_title || item.title || "")}</div>
+        <div class="row-meta">${escapeHtml(item.episode || item.title || "")}</div>
+        <div class="bar" role="progressbar" aria-valuenow="${Math.max(0,Math.min(100,Number(item.progress)||0))}" aria-valuemin="0" aria-valuemax="100" aria-label="${escapeHtml(t.fortschritt || t.kartentitel)}"><i style="width:${Math.max(0,Math.min(100,Number(item.progress)||0))}%"></i></div>
+        <span class="status-badge ${complete ? (ready ? "success" : "warning") : queueTone(item)}">${escapeHtml(`${Math.round(Number(item.progress)||0)} % · ${status}`)}</span>
+        ${problem ? this._errorMarkup(problem,t.import_fehler,false) : ""}
       </div>
       <div class="actions">
-        <button class="act-check quiet" ${this._busy ? "disabled" : ""}>
-          ${arrIcon("search")}<span class="lbl">${escapeHtml(t.pruefen)}</span>
-        </button>
-        <button class="act-delete danger" ${this._busy ? "disabled" : ""}>
-          ${arrIcon("trash")}<span class="lbl">${escapeHtml(t.loeschen)}</span>
-        </button>
+        ${ready ? `<label class="select-label"><input type="checkbox" class="item-select" aria-label="${escapeHtml(`${t.auswahl_importieren}: ${item.parent_title || item.title}`)}" ${this._selected.has(id) ? "checked" : ""} ${this._busy ? "disabled" : ""}></label><button class="act-import quiet" ${this._busy ? "disabled" : ""}>${escapeHtml(t.importieren)}</button>` : ""}
+        ${complete ? `<button class="act-check quiet" ${this._busy ? "disabled" : ""}>${escapeHtml(item.import_state === "selection_required" ? t.auswahl_datei : t.pruefen)}</button>` : ""}
+        <button class="act-delete danger" ${this._busy ? "disabled" : ""}>${escapeHtml(t.loeschen)}</button>
       </div>
     </div>`;
   }
 
   _bind() {
-    this.shadowRoot.querySelectorAll(".row").forEach((row) => {
-      const downloadId = row.dataset.download;
-      const itemId = Number(row.dataset.item);
-      const titel = row.querySelector(".row-title").textContent.trim();
-      const check = row.querySelector(".act-check");
-      if (check) BuschUI.action({node:check,label:check.getAttribute("aria-label")||check.title||this._t().pruefen,onClick:() => this._check(downloadId)});
-      const del = row.querySelector(".act-delete");
-      if (del) BuschUI.action({node:del,label:del.getAttribute("aria-label")||del.title||this._t().loeschen,variant:"danger",onClick:() => this._fragLoeschen(itemId, titel)});
+    const bind = (selector,callback) => this.shadowRoot.querySelector(selector)?.addEventListener("click",callback);
+    bind(".act-retry",()=>this._load());
+    bind(".act-refresh",()=>this._load());
+    bind(".act-prev",()=>{this._page=Math.max(0,this._page-1);this._render();this.shadowRoot.querySelector('.act-prev')?.focus();});
+    bind(".act-next",()=>{this._page+=1;this._render();this.shadowRoot.querySelector('.act-next')?.focus();});
+    bind(".act-bulk",()=>this._importReady());
+    bind(".act-selected",()=>this._importSelected());
+    this.shadowRoot.querySelectorAll(".row.import-row").forEach(row => {
+      const id = Number(row.dataset.item), item = this._data.items.find(item => this._id(item) === id);
+      row.querySelector(".act-import")?.addEventListener("click",()=>this._import(id));
+      row.querySelector(".act-check")?.addEventListener("click",()=>this._check(id));
+      row.querySelector(".act-delete")?.addEventListener("click",()=>this._fragLoeschen(id,item.parent_title || item.title));
+      const toggle = event => {
+        if (this._busy || !this._ready(item)) return;
+        const checked = !this._selected.has(id);
+        const ids = this._data.items.filter(item=>this._ready(item)).map(item=>this._id(item));
+        const range = event.shiftKey && this._lastSelected != null ? ids.slice(Math.min(ids.indexOf(id),ids.indexOf(this._lastSelected)),Math.max(ids.indexOf(id),ids.indexOf(this._lastSelected))+1) : [id];
+        range.forEach(key => checked ? this._selected.add(key) : this._selected.delete(key));
+        this._lastSelected = id;
+        this._render();
+        this.shadowRoot.querySelector(`.row[data-item="${id}"] input`)?.focus();
+      };
+      row.querySelector(".item-select")?.addEventListener("click",toggle);
+      row.addEventListener("click",event=>{ if ((event.ctrlKey || event.metaKey || event.shiftKey) && !event.target.closest("button,input,label")) toggle(event); });
     });
   }
 
-  /** Prüfergebnis als Dialog: Titel, X, eine Hauptaktion, Abbrechen. */
-  async _check(downloadId) {
+  async _check(queueItemId) {
+    if (this._busy || !queueItemId) return;
+    this._open = {queue_item_id:queueItemId,loading:true,candidate_id:null};
     const t = this._t();
-    if (!downloadId) {
-      this._message = t.ohne_kennung;
-      this._render();
-      return;
-    }
-    this._open = { downloadId, loading: true };
-    this._message = null;
-    this._render();
     const dialog = this._oeffneDialog({
-      titel: t.dialog_pruefen,
-      schliessen: t.schliessen,
-      koerper: () => this._dialogKoerper(),
-      aktionen: this._dialogAktionen(),
-      beiAktion: (id, dlg) => {
-        if (id === "import") {
-          dlg.close();
-          this._import(downloadId);
-          return;
-        }
-        dlg.close();
-      },
-      beimSchliessen: () => {
-        this._open = null;
-      },
+      titel:t.dialog_pruefen,schliessen:t.schliessen,
+      dirty:()=>!!this._open?.candidate_id,busy:()=>!!this._busy,
+      koerper:()=>this._dialogKoerper(),aktionen:this._dialogAktionen(),
+      binden:(root,dlg)=>root.querySelectorAll(".candidate-radio").forEach(input=>input.addEventListener("change",()=>{
+        this._open.candidate_id = input.dataset.candidate;
+        dlg.model = {...dlg._model,aktionen:this._dialogAktionen()};
+      })),
+      beiAktion:(id,dlg)=>{ if(id==="import") this._import(queueItemId,this._open?.candidate_id,dlg); else dlg.close(); },
+      beimSchliessen:()=>{this._open=null;}
     });
     try {
-      const result = await this._call("arrstack/manual_import", {
-        download_id: downloadId,
-        action: "candidates",
-      });
-      this._open = { downloadId, ...result, loading: false };
+      const result = await this._call("arrstack/inspect_import",{queue_item_id:queueItemId});
+      if (!dialog.isConnected) return;
+      this._open = {...result,queue_item_id:queueItemId,loading:false,candidate_id:null};
     } catch (error) {
-      this._open = { downloadId, loading: false, fehler: this._errorText(error) };
+      if (!dialog.isConnected) return;
+      this._open = {queue_item_id:queueItemId,loading:false,fehler:error};
     }
-    if (dialog.isConnected) {
-      dialog.model = {
-        ...dialog._model,
-        koerper: () => this._dialogKoerper(),
-        aktionen: this._dialogAktionen(),
-      };
-    }
+    dialog.model = {...dialog._model,aktionen:this._dialogAktionen()};
   }
 
   _dialogKoerper() {
-    const t = this._t();
-    const info = this._open;
+    const info = this._open, t = this._t();
     if (!info) return "";
-    if (info.loading) return `<div class="dlg-text">${escapeHtml(t.pruefe)}</div>`;
-    if (info.fehler) return `<div class="dlg-text">${escapeHtml(info.fehler)}</div>`;
+    if (info.loading) return `<div class="dlg-text" role="status">${escapeHtml(t.pruefe)}</div>`;
+
     const candidates = info.candidates || [];
-    const list = candidates.length
-      ? candidates
-          .map(
-            (candidate) => `<div class="dlg-text">${escapeHtml(
-              [
-                candidate.name,
-                candidate.parent,
-                (candidate.episodes || []).join(", "),
-                (candidate.rejections || []).join("; "),
-              ]
-                .filter(Boolean)
-                .join(" · ")
-            )}</div>`
-          )
-          .join("")
-      : `<div class="dlg-text">${escapeHtml(t.keine_datei)}</div>`;
-    const grund = info.can_auto_import
-      ? ""
-      : `<div class="dlg-sub">${escapeHtml(
-          fuelle(t.gesperrt, {
-            grund: (info.reasons || []).join("; ") || t.gesperrt_ohne_grund,
-          })
-        )}</div>`;
-    return list + grund;
+    return `${info.fehler ? this._errorMarkup(info.fehler,t.import_fehler,false) : ""}<div class="dlg-text">${escapeHtml(info.parent_title || info.title || "")}</div>
+      <div class="dlg-sub">${escapeHtml(this._stateLabel(info))}</div>
+      ${info.last_error ? this._errorMarkup({message:info.last_error},t.import_status,false) : ""}
+      ${candidates.length ? candidates.map(candidate=>`<div class="candidate">
+        <label class="select-label">
+          <input class="candidate-radio" type="radio" name="candidate" data-candidate="${escapeHtml(candidate.candidate_id)}" ${info.candidate_id===candidate.candidate_id ? "checked" : ""} ${!candidate.valid || this._busy ? "disabled" : ""}>
+          <span class="dlg-text">${escapeHtml(candidate.filename || candidate.name || "")}</span>
+        </label>
+        <div class="dlg-sub">${escapeHtml([formatBytes(candidate.size,t),candidate.quality,...(candidate.languages||[]),candidate.release_group,...(candidate.custom_formats||[])].filter(Boolean).join(" · "))}</div>
+        ${!candidate.valid ? `<div class="dlg-sub">${escapeHtml(t.datei_ungueltig)}</div>` : ""}
+        <details><summary>${escapeHtml(t.details)}</summary><div class="dlg-text">${escapeHtml(candidate.path || "")}</div><div class="dlg-sub">${escapeHtml((candidate.rejections||[]).join(" · "))}</div></details>
+      </div>`).join("") : `<div class="dlg-sub">${escapeHtml(t.keine_datei)}</div>`}`;
   }
 
-  /** Höchstens zwei Knöpfe, einer davon Abbrechen (Design Gallery). */
   _dialogAktionen() {
-    const t = this._t();
-    const info = this._open || {};
-    return [
-      { id: "cancel", text: t.abbrechen, art: "quiet" },
-      {
-        id: "import",
-        text: t.importieren,
-        art: "primary",
-        icon: "check",
-        aus: !info.can_auto_import,
-      },
-    ];
+    const info = this._open || {}, t = this._t();
+    const candidate = (info.candidates || []).find(candidate=>candidate.candidate_id===info.candidate_id && candidate.valid);
+    return [{id:"cancel",text:t.abbrechen,art:"quiet",aus:!!this._busy},
+      {id:"import",text:t.importieren,art:"primary",icon:"check",aus:!!this._busy || (!this._ready(info) && !(this._relevant(info) && candidate))}];
   }
 
-  /** Rückfrage vor dem Löschen: schmaler Dialog, rote Endaktion. */
-  _fragLoeschen(itemId, titel) {
+  _fragLoeschen(itemId,titel) {
+    if (!itemId || this._busy) return;
     const t = this._t();
-    if (!itemId) return;
-    this._oeffneDialog({
-      titel: t.dialog_loeschen,
-      schliessen: t.schliessen,
-      schmal: true,
-      koerper: () =>
-        `<div class="dlg-text">${escapeHtml(t.loeschen_frage)}</div>
-         <div class="dlg-sub">${escapeHtml(titel)}</div>`,
-      aktionen: [
-        { id: "cancel", text: t.abbrechen, art: "quiet" },
-        { id: "delete", text: t.loeschen, art: "danger primary", icon: "trash" },
-      ],
-      beiAktion: (id, dlg) => {
-        dlg.close();
-        if (id === "delete") this._delete(itemId);
-      },
-    });
+    this._oeffneDialog({titel:t.dialog_loeschen,schliessen:t.schliessen,schmal:true,
+      koerper:()=>`<div class="dlg-text">${escapeHtml(t.loeschen_frage)}</div><div class="dlg-sub">${escapeHtml(titel)}</div>`,
+      aktionen:[{id:"cancel",text:t.abbrechen,art:"quiet"},{id:"delete",text:t.loeschen,art:"danger primary",icon:"trash"}],
+      beiAktion:(id,dlg)=>{dlg.close();if(id==="delete")this._delete(itemId);}});
   }
 
-  async _import(downloadId) {
-    const t = this._t();
-    this._busy = downloadId;
-    this._message = null;
+  async _mutate(type,params={},dialog=null) {
+    if (this._busy) return;
+    this._busy = type; this._message = null; this._operationError = null;
     this._render();
+    if (dialog) { if (this._open) this._open.fehler=null; dialog.model = {...dialog._model,aktionen:this._dialogAktionen()}; }
     try {
-      const result = await this._call("arrstack/manual_import", {
-        download_id: downloadId,
-        action: "import",
-      });
-      this._message = fuelle(t.importiert, { n: result.imported });
-      this._open = null;
-    } catch (error) {
-      this._message = this._errorText(error);
+      const result = await this._call(type,params);
+      const results = result.results || [result];
+      if (dialog && this._open && result.status === "skipped") {
+        const selected = this._open.candidate_id;
+        this._open = {...this._open,...result,candidate_id:null,fehler:null};
+        if (result.candidates?.some(candidate=>candidate.valid && candidate.candidate_id===selected)) this._open.candidate_id=selected;
+      }
+      const submitted = results.filter(item=>item.status==="submitted").length;
+      const skipped = results.filter(item=>item.status==="skipped").length;
+      const errors = results.filter(item=>item.status==="error" || (item.status==="skipped" && item.last_error));
+      if (dialog && errors.length && this._open) this._open.fehler={message:errors[0].last_error};
+      results.forEach(item=>{if(item.status==="error" || (item.status==="skipped" && item.last_error))this._itemErrors.set(Number(item.queue_item_id),{message:item.last_error});else this._itemErrors.delete(Number(item.queue_item_id));});
+      this._message = fuelle(this._t().uebermittelt,{n:submitted}) + (skipped ? ` ${fuelle(this._t().uebersprungen,{n:skipped})}` : "") + (errors.length ? ` ${fuelle(this._t().teilfehler,{n:errors.length})}` : "");
+      if (dialog && !errors.length && submitted) dialog.close(true);
+    } catch(error) {
+      if (dialog && this._open) this._open.fehler = error;
+      else this._operationError = error;
+    } finally {
+      this._busy = null;
+      if (dialog?.isConnected) dialog.model = {...dialog._model,aktionen:this._dialogAktionen()};
+      await this._load();
     }
-    this._busy = null;
-    await this._load();
   }
-
+  _import(queueItemId,candidateId,dialog) { return this._mutate("arrstack/import_item",{queue_item_id:queueItemId,...(candidateId ? {candidate_id:candidateId} : {})},dialog); }
+  _importReady() { return this._mutate("arrstack/import_ready"); }
+  _importSelected() {
+    const ids=(this._data?.items || []).filter(item=>this._ready(item) && this._selected.has(this._id(item))).map(item=>this._id(item));
+    if (ids.length) return this._mutate("arrstack/import_selected",{queue_item_ids:ids});
+  }
   async _delete(itemId) {
-    const t = this._t();
-    if (!itemId) return;
-    this._busy = itemId;
-    this._message = null;
-    this._render();
-    try {
-      await this._call("arrstack/queue_remove", {
-        item_id: itemId,
-        remove_from_client: true,
-        blocklist: false,
-      });
-      this._message = t.geloescht;
-      this._open = null;
-    } catch (error) {
-      this._message = this._errorText(error);
-    }
-    this._busy = null;
-    await this._load();
+    if (this._busy) return;
+    this._busy = itemId; this._render();
+    try { await this._call("arrstack/queue_remove",{item_id:itemId,remove_from_client:true,blocklist:false}); this._message=this._t().geloescht; }
+    catch(error) { this._operationError=error; }
+    finally { this._busy=null; await this._load(); }
   }
 }
 
@@ -2229,6 +2356,10 @@ class ArrstackSeerCard extends ArrstackCardBase {
     this._selected = new Set();
     this._message = null;
     this._busy = false;
+    this._searching = false;
+    this._opening = false;
+    this._initialSelection = "";
+    this._requestError = null;
   }
 
   /** Die Suche wird ausgelöst, nicht gepollt. */
@@ -2240,7 +2371,7 @@ class ArrstackSeerCard extends ArrstackCardBase {
   _render() {
     if (!this._config) return;
     const t = this._t();
-    this.shadowRoot.innerHTML = `<style>${ARRSTACK_STYLES}
+    this.shadowRoot.innerHTML = `<style>${ARRSTACK_STYLES}${ARRSTACK_COMPACT}
       .search { display: flex; gap: var(--arr-space-2); margin-bottom: var(--arr-space-4); }
       .search input {
         flex: 1 1 auto;
@@ -2258,12 +2389,12 @@ class ArrstackSeerCard extends ArrstackCardBase {
       .row.result { cursor: pointer; min-height: 66px; }
       </style>
       <ha-card>
-        ${this._head("jellyfish")}
+        ${this._head("jellyfish", this._searching ? t.laden : this._results?.length ? fuelle(t.treffer,{n:this._results.length}) : t.bereit, "neutral")}
         <div class="search">
           <input type="search" placeholder="${escapeHtml(t.platzhalter)}"
             value="${escapeHtml(this._query)}" aria-label="${escapeHtml(t.suchbegriff)}">
           <button class="go quiet" aria-label="${escapeHtml(t.suchen)}"
-            title="${escapeHtml(t.suchen)}">${arrIcon("search")}</button>
+            title="${escapeHtml(t.suchen)}" ${this._searching || this._opening ? "disabled" : ""}>${arrIcon("search")}</button>
         </div>
         ${this._message ? `<div class="notice">${escapeHtml(this._message)}</div>` : ""}
         ${this._body()}
@@ -2274,8 +2405,9 @@ class ArrstackSeerCard extends ArrstackCardBase {
   _body() {
     const t = this._t();
     if (this._error) {
-      return `<div class="notice problem">${escapeHtml(this._errorText(this._error))}</div>`;
+      return this._errorMarkup(this._error, t.fehler_suche);
     }
+    if (this._searching || this._opening) return `<div class="notice" role="status">${escapeHtml(t.laden)}</div>`;
     if (this._results === null) {
       return this._empty("search", t.leer);
     }
@@ -2310,7 +2442,7 @@ class ArrstackSeerCard extends ArrstackCardBase {
     const t = this._t();
     const show = this._show;
     if (!show) return "";
-    const seasons = show.seasons || [];
+    const seasons = (show.seasons || []).filter(season => Number.isInteger(season.season) && Number(season.episodes) > 0);
     const chips = seasons
       .map((season) => {
         const available = season.status_code === 5;
@@ -2324,7 +2456,7 @@ class ArrstackSeerCard extends ArrstackCardBase {
         </button>`;
       })
       .join("");
-    return `<div class="row">
+    return `${this._requestError ? this._errorMarkup(this._requestError, t.fehler_allgemein,false) : ""}<div class="row">
         ${posterMarkup(show.poster)}
         <div class="row-main">
           <div class="row-title">${escapeHtml(show.title || "")}</div>
@@ -2337,15 +2469,18 @@ class ArrstackSeerCard extends ArrstackCardBase {
   _dialogAktionen() {
     const t = this._t();
     return [
-      { id: "cancel", text: t.abbrechen, art: "quiet" },
-      { id: "request", text: t.anfragen, art: "primary", icon: "download", aus: this._busy },
+      { id: "cancel", text: t.abbrechen, art: "quiet", aus: this._busy },
+      { id: "request", text: t.anfragen, art: "primary", icon: "download", aus: this._busy || (this._show?.media_type === "tv" && !this._selected.size) || this._show?.status === "available" },
     ];
   }
 
   /** Der Dialog bringt eigene Formen mit — er liegt außerhalb der Karte. */
   _oeffneDetail() {
     const t = this._t();
+    this._initialSelection = [...this._selected].sort((a,b)=>a-b).join(",");
     return this._oeffneDialog({
+      dirty:()=>[...this._selected].sort((a,b)=>a-b).join(",") !== this._initialSelection,
+      busy:()=>this._busy,
       titel: t.dialog_anfragen,
       schliessen: t.schliessen,
       koerper: () => this._dialogKoerper(),
@@ -2356,7 +2491,7 @@ class ArrstackSeerCard extends ArrstackCardBase {
             const season = Number(chip.dataset.season);
             if (this._selected.has(season)) this._selected.delete(season);
             else this._selected.add(season);
-            dialog.aktualisieren();
+            dialog.model = {...dialog._model,aktionen:this._dialogAktionen()};
           });
         });
       },
@@ -2376,10 +2511,12 @@ class ArrstackSeerCard extends ArrstackCardBase {
   _bind() {
     const input = this.shadowRoot.querySelector("input");
     if (input) {
+      input.addEventListener("input",()=>{this._query=input.value;});
       input.addEventListener("keydown", (event) => {
         if (event.key === "Enter") this._search(input.value);
       });
     }
+    this.shadowRoot.querySelector(".act-retry")?.addEventListener("click",()=>this._search(this._query));
     const go = this.shadowRoot.querySelector(".go");
     if (go) BuschUI.action({node:go,label:go.getAttribute("aria-label")||go.title||go.textContent,onClick:() => this._search(input && input.value)});
     this.shadowRoot.querySelectorAll(".result").forEach((row) => {
@@ -2394,23 +2531,24 @@ class ArrstackSeerCard extends ArrstackCardBase {
   }
 
   async _search(query) {
+    if (this._searching || this._opening) return;
     this._query = String(query || "").trim();
-    this._message = null;
-    this._schliesseDialog();
-    this._show = null;
     if (!this._query) return;
+    this._message = null; this._error = null;
+    this._searching = true; this._render();
     try {
-      const result = await this._call("arrstack/search", { query: this._query });
+      const result = await this._call("arrstack/search", {query:this._query});
       this._results = result.results || [];
-      this._error = null;
-    } catch (error) {
-      this._error = error;
+    } catch(error) { this._error=error; }
+    finally {
+      this._searching=false; this._render();
+      this.shadowRoot.querySelector("input")?.focus();
     }
-    this._render();
   }
 
   async _openResult(item) {
-    if (!item) return;
+    if (!item || this._opening || this._busy) return;
+    this._requestError = null;
     this._message = null;
     if (item.media_type === "movie") {
       this._show = { ...item, seasons: [] };
@@ -2418,13 +2556,14 @@ class ArrstackSeerCard extends ArrstackCardBase {
       this._oeffneDetail();
       return;
     }
+    this._opening = true;
     try {
       const show = await this._call("arrstack/tv_seasons", { tmdb_id: item.id });
       // Fehlende Staffeln vorbelegt, vorhandene nicht — der häufigste Wunsch
       // ist „alles, was noch fehlt".
       this._selected = new Set(
         (show.seasons || [])
-          .filter((season) => season.status_code !== 5 && season.season !== 0)
+          .filter((season) => season.status_code !== 5 && season.season !== 0 && Number(season.episodes) > 0)
           .map((season) => season.season)
       );
       this._show = { ...show, media_type: "tv", id: item.id };
@@ -2433,36 +2572,31 @@ class ArrstackSeerCard extends ArrstackCardBase {
       return;
     } catch (error) {
       this._error = error;
-    }
+    } finally { this._opening = false; }
     this._render();
   }
 
   async _request(dialog) {
-    const t = this._t();
-    const show = this._show;
-    if (!show) return;
-    const seasons = [...this._selected].sort((a, b) => a - b);
-    if (show.media_type === "tv" && !seasons.length) {
-      this._message = t.staffel_waehlen;
-      dialog.close();
-      this._render();
-      return;
-    }
-    this._busy = true;
+    const t = this._t(), show = this._show;
+    if (!show || this._busy) return;
+    const seasons=[...this._selected].sort((a,b)=>a-b);
+    if (show.media_type === "tv" && !seasons.length) return;
+    this._busy=true; this._requestError=null;
+    dialog.model={...dialog._model,aktionen:this._dialogAktionen()};
     try {
-      const result = await this._call("arrstack/request", {
-        media_type: show.media_type,
-        media_id: show.id,
-        ...(show.media_type === "tv" ? { seasons } : {}),
-      });
-      this._message = fuelle(t.angefragt, { n: result.request_id });
-    } catch (error) {
-      this._message = this._errorText(error);
+      const result=await this._call("arrstack/request",{media_type:show.media_type,media_id:show.id,...(show.media_type === "tv" ? {seasons} : {})});
+      this._message=fuelle(t.angefragt,{n:result.request_id});
+      const resultItem=this._results?.find(item=>item.id===show.id && item.media_type===show.media_type);
+      if (resultItem) resultItem.status="pending";
+      dialog.close(true);
+    } catch(error) { this._requestError=error; }
+    finally {
+      this._busy=false;
+      if (dialog.isConnected) dialog.model={...dialog._model,aktionen:this._dialogAktionen()};
+      this._render();
     }
-    this._busy = false;
-    dialog.close();
-    this._render();
   }
+
 }
 
 /** Statuszahlen von Seerr in Worte (Enum aus Jellyseerr/Seerr). */

@@ -181,13 +181,14 @@ PAGE = """<!doctype html>
       progress: 100, status: 'completed', tracked_state: 'importing', messages: [] },
   ];
 
+  const candidate = (id) => ({candidate_id: String(id),valid:true,
+    filename:'Beispielserie.S01E09.1080p.German.WEB-LangerDateiname.mkv',
+    path:'/example/download/file.mkv',size:2.1e9,quality:'WEBDL-1080p',languages:['German'],release_group:'Example',custom_formats:[],rejections:[]});
   const PROBLEMS = [
-    { id: 41, download_id: 'x9', title: LANG, parent_title: null,
-      tracked_state: 'importPending', unknown: true,
-      messages: ['Unbekannte.Serie.S02E05.1080p: Unknown series, and a rather long explanation why'] },
-    { id: 42, download_id: 'y7', title: 'Beispielserie.S01E09.1080p', parent_title: 'Beispielserie',
-      tracked_state: 'importBlocked', unknown: false,
-      messages: ['Beispielserie.S01E09: Existing file is better'] },
+    {id:41,queue_item_id:41,download_id:'x9',title:LANG,parent_title:'Beispielserie',episode:'S01E09',progress:100,download_complete:true,status:'completed',tracked_state:'importBlocked',import_state:'selection_required',candidate_count:2,candidates:[candidate(1),candidate(2)]},
+    {id:42,queue_item_id:42,download_id:'y7',title:'Bereiter Film',parent_title:'Bereiter Film',progress:100,download_complete:true,status:'completed',tracked_state:'importPending',import_state:'ready',candidate_count:1,candidates:[candidate(3)]},
+    {id:43,queue_item_id:43,download_id:'z3',title:'Kein Treffer',parent_title:'Kein Treffer',progress:100,download_complete:true,status:'completed',tracked_state:'importBlocked',import_state:'no_match',candidate_count:0,candidates:[]},
+    {id:44,queue_item_id:44,download_id:'a4',title:'Aktiver Download',parent_title:'Aktiver Download',progress:50,download_complete:false,status:'downloading',tracked_state:'downloading',import_state:'not_applicable',candidate_count:null,candidates:[]}
   ];
 
   const RECENT = [
@@ -233,20 +234,16 @@ PAGE = """<!doctype html>
                                    total: window.__emptyQueue ? 0 : QUEUE.length, speed: 5.4e6 });
         case 'arrstack/recent':
           return Promise.resolve({ service: 'sonarr', brand: 'sonarr', items: RECENT });
-        case 'arrstack/import_problems':
-          return Promise.resolve({ service: 'sonarr', brand: 'sonarr', items: PROBLEMS });
-        case 'arrstack/manual_import':
-          if (msg.action === 'import') {
-            window.__ergebnisse.imported += 1;
-            return Promise.resolve({ imported: 1 });
-          }
-          return Promise.resolve({
-            service: 'sonarr', can_auto_import: false,
-            reasons: ['unknownSeries', 'Keine Serie/kein Film zugeordnet'],
-            candidates: [{ name: 'Unbekannte.Serie.S02E05.1080p.German.DL.WEB.h264-LANGERNAME.mkv',
-                           size: 2.1e9, quality: 'WEBDL-1080p', parent: null, episodes: [],
-                           rejections: ['unknownSeries'] }],
-          });
+        case 'arrstack/refresh_import_queue':
+          return Promise.resolve({service:msg.service || 'sonarr',brand:msg.service || 'sonarr',items:PROBLEMS});
+        case 'arrstack/inspect_import':
+          return Promise.resolve({...PROBLEMS.find(item => item.queue_item_id === msg.queue_item_id)});
+        case 'arrstack/import_item':
+          window.__ergebnisse.imported += 1;
+          return Promise.resolve({...PROBLEMS.find(item => item.queue_item_id === msg.queue_item_id),status:'submitted',imported:1});
+        case 'arrstack/import_ready':
+        case 'arrstack/import_selected':
+          return Promise.resolve({service:'sonarr',results:PROBLEMS.filter(item=>item.import_state==='ready').map(item=>({...item,status:'submitted',imported:1}))});
         case 'arrstack/queue_remove':
           window.__ergebnisse.geloescht += 1;
           return Promise.resolve({ ok: true });
@@ -392,14 +389,14 @@ try:
             return {name: regeln.messe_text(p, tag) for name, tag in KARTEN.items()}
 
         page.evaluate("() => document.documentElement.classList.remove('ha-tokens')")
-        ui_ohne_tokens = regeln.lauf_breiten(page, messung=messe_alle)
+        ui_ohne_tokens = regeln.lauf_breiten(page, breiten=(320,390,480,960), messung=messe_alle)
 
         page.evaluate("() => document.documentElement.classList.add('ha-tokens')")
-        ui_mit_tokens = regeln.lauf_breiten(page, messung=messe_alle)
+        ui_mit_tokens = regeln.lauf_breiten(page, breiten=(320,390,480,960), messung=messe_alle)
         page.evaluate("() => document.documentElement.classList.remove('ha-tokens')")
 
         # Screenshots aus dem Regel-1-Lauf, damit jemand hineinsehen kann.
-        for breite in (320, 480, 960):
+        for breite in (320,390,480,960):
             for thema in ("light", "dark"):
                 page.set_viewport_size({"width": breite, "height": 1200})
                 page.evaluate("(t) => { document.documentElement.dataset.theme = t; }", thema)
@@ -431,7 +428,7 @@ try:
                 if (row) row.click();
             }"""),
             popup_selektor=".sheet",
-            schliessen_knopf_selektor=".dlg-close")
+            schliessen_knopf_selektor=".dlg-close", dialog_typ="bearbeitung")
 
         alles_zu(page)
         popups["fix_pruefen"] = regeln.messe_popup(
@@ -440,7 +437,7 @@ try:
                 "() => { const b = window.__cards.fix.shadowRoot"
                 "          .querySelector('.act-check'); if (b) b.click(); }"),
             popup_selektor=".sheet",
-            schliessen_knopf_selektor=".dlg-close")
+            schliessen_knopf_selektor=".dlg-close", dialog_typ="bearbeitung")
 
         alles_zu(page)
         popups["fix_loeschen"] = regeln.messe_popup(
@@ -449,7 +446,7 @@ try:
                 "() => { const b = window.__cards.fix.shadowRoot"
                 "          .querySelector('.act-delete'); if (b) b.click(); }"),
             popup_selektor=".sheet",
-            schliessen_knopf_selektor=".dlg-close")
+            schliessen_knopf_selektor=".dlg-close", dialog_typ="bestaetigung")
 
         # ── Regel 1 im Dialog ────────────────────────────────────────────────
         # Bezugsrechteck ist `.sheet`, das sichtbare Blatt — NICHT der Host
@@ -495,6 +492,7 @@ try:
             auf(page)
             ui_dialog[name] = regeln.lauf_breiten(
                 page,
+                breiten=(320,390,480,960),
                 messung=lambda p: regeln.messe_text(p, ".sheet"),
                 vor_messung=auf)
             alles_zu(page)
@@ -554,6 +552,7 @@ try:
                      zIndex: h.zIndex, position: h.position,
                      pointerEvents: h.pointerEvents };
         }""")
+        laenge_vorher = page.evaluate("() => history.length")
         # Scrim: ein Klick neben das Blatt schließt, ohne Eintrag zu hinterlassen.
         page.evaluate("""() => {
             const d = document.querySelector('arrstack-dialog');
@@ -744,7 +743,7 @@ for name, messung in popups.items():
         name, json.dumps({k: v["ergebnis"] for k, v in messung.items()},
                          ensure_ascii=False)))
 print("Eigene Prüfungen:", json.dumps(
-    {"scrim_schliesst": eigen.get("scrim", {}).get("danach_offen") is False,
+    {"scrim_geschuetzt": eigen.get("scrim", {}).get("danach_offen") is True,
      "scrim_ohne_waisen": eigen.get("scrim", {}).get("history_length_vorher")
                           == eigen.get("scrim", {}).get("history_length_nachher"),
      "sheet_960": eigen.get("breit_960", {}).get("sheetBreite"),
@@ -774,8 +773,8 @@ if not (selbst["ellipsis_nicht_gemeldet"] and selbst["ellipsis_als_gekuerzt_geza
     schlecht = 1
 # Die Spec verlangt mehr, als das Modul misst: Scrim, Vollbildgrenze,
 # Dialogbreite und der Editorvertrag. Ein Fehlschlag dort ist derselbe Fehler.
-if eigen.get("scrim", {}).get("danach_offen") is not False:
-    print("FEHLER: Der Klick neben den Dialog schließt ihn nicht.")
+if eigen.get("scrim", {}).get("danach_offen") is not True:
+    print("FEHLER: R04: Der Klick neben den Bearbeitungsdialog hat ihn geschlossen.")
     schlecht = 1
 if eigen.get("scrim", {}).get("history_length_vorher") != \
         eigen.get("scrim", {}).get("history_length_nachher"):

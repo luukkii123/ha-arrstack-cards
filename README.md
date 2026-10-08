@@ -289,3 +289,28 @@ UI-Quelle 0.3.2. Gegenüber den geprüften Bundlebytes wurde ausschließlich
 Speichern und Wiederöffnen; lokale Suiten und Darstellungsmatrizen sind oben
 dokumentiert. Der vorhandene native Pickerkonflikt bleibt eine benannte Grenze.
 Keine produktiven Geräteaktionen wurden für die Abnahme ausgeführt.
+
+### Lokal geprüft am 08.10.2026 · Kandidat 0.5.0 (unveröffentlicht)
+
+Seer zeigt kompakte Treffer mit tatsächlichen Staffeln, klaren Fehlern und
+Retry; technische Details bleiben eingeklappt. Sonarr/Radarr nutzen dieselben
+Backend-Actions für Kandidatenprüfung, expliziten Einzelimport und sichere
+Sammelimporte. Aktive Downloads zeigen keinen Kandidatenstatus. Die Queue
+bleibt mit editierbaren fünf Einträgen pro Seite dashboardtauglich; Auswahl
+und Seitenwechsel sind per Checkbox, Ctrl/Cmd und Shift erreichbar.
+
+Erfordert für die neuen Importkommandos `ha-arrstack-integrations` 0.4.0 oder
+neuer. Kein Kandidat wird im Frontend per Dateiname/Pfad geraten. Der Server
+prüft vor jedem Import frisch. Eine abweichende Kandidatenantwort aktualisiert
+auch den offenen Dialog; stale Auswahl wird nicht weiter als bereit angezeigt.
+
+Bearbeitungs-/Bestätigungsdialoge ignorieren Außenklick. Escape/Zurück/Abbrechen
+schützen geänderte Auswahl mit explizitem Verwerfen; Fokus bleibt im Dialog
+und kehrt zurück. Details und Einträge bleiben bei einem Fehler erhalten.
+
+Parser-/Editor-/Importregressionen und statische UI-Prüfung bestanden. Echter
+Chromium prüfte 320/390/480/960 px in Hell/Dunkel sowie denselben Kandidaten
+browserlokal im echten HA-Frontend mit synthetischen Medienantworten und
+Schreibsperre. Die [26-Regel-Matrix](docs/design-audit-2026-10-08-arrcompact.md)
+nennt Belege und die verbleibenden Host-/Screenreader-/Zoom-/Feldmessgrenzen.
+Dies ist keine veröffentlichte oder installierte Version.
