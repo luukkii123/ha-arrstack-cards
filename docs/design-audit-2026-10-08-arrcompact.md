@@ -11,8 +11,15 @@ Vor Implementierung wurden alle 26 Regeln auf Anwendbarkeit geprüft. R07
 läuft im HA-Host, bietet keine Ziehaktion und fordert keine Browserberechtigung.
 Die übrigen Regeln sind im betroffenen Karten-/Editor-/Dialogumfang anwendbar.
 R04 hat ausdrücklich Vorrang vor der älteren pauschalen Scrim-Schließregel.
-Die strengere HACS-Mobile-Regel bleibt erhalten: ein kompakter Desktopdialog
-wird unter 450 px zum mobilen Vollbild mit festen unteren Aktionen.
+Der Plan fordert ausdrücklich keine unnötig großen Vollbild-Flows. Das
+kollidiert mit der älteren pauschalen HACS-Mobile-Vollbildregel; die erste
+Umsetzung übernahm diese Regel und erfüllte den Plan an der Staffelwahl nicht.
+Die geprüfte Folgekorrektur hält Staffel- und Filmanfrage nun auf allen Breiten
+inline direkt am Treffer, ohne doppeltes Poster/Titel und ohne Historyeintrag.
+Dirty Escape/Abbrechen schützt weiterhin die Auswahl. Kandidatenprüfung
+bleibt wegen potenziell langer Pfad-/Ablehnungsdiagnosen ein geschützter,
+inhaltshoher Dialog mit Maxhöhe/Body-Scroll auch mobil. Die destruktive
+Löschbestätigung behält den bisherigen mobilen Vollbildvertrag.
 
 ## Tatsächlich ausgeführte Nachweise
 
@@ -20,16 +27,16 @@ wird unter 450 px zum mobilen Vollbild mit festen unteren Aktionen.
   `tests/editor.test.js`, `tests/import-seer.test.js`. Import-/Suchregressionen
   mit 20/50/99/100 %, eindeutigem Kandidat, frischer `skipped`-Antwort und
   veralteter Dateiauswahl, eingeklappten Rohfehlern und Such-Doppelausführung.
-  Die Importbereitschaft und der stale-Kandidat-Gegenbeleg waren vor dem Fix rot.
+  Die Importbereitschaft, stale-Kandidat- und Inline-/TV-Movie-ID-Gegenproben waren vor dem jeweiligen Fix rot. Während einer Anfrage sind Staffelchips gesperrt.
 - **E02** `../scripts/ui-regeln-pruefen.py --repo ha-arrstack-cards`: 0 Verstöße.
 - **E03** `docs/render/render.py`: echter Chromium, alle vier Karten bei
-  320/390/480/960 px in Hell/Dunkel mit/ohne HA-Tokens. Textmessung, drei
+  320/390/480/960 px in Hell/Dunkel mit/ohne HA-Tokens. Textmessung, Inline-Staffelwahl, zwei
   Dialoge, Escape/Back/Schließen/Stacking/Außenklick und zweisprachige Editorfelder;
   0 Überlauf, außerhalb, Überlappung oder Verletzung. Werkzeug-Gegenproben grün.
 - **E04** `docs/render/compact-contract.py`: derselbe lokale Kandidat zusätzlich
   im echten HA-Frontend am vorhandenen Testdashboard. Browserlokale Montage;
   synthetische Medienantworten und Actions. Native Mode sperrt HTTP-Schreibzugriffe
-  sowie mutierende WS-Kommandos vor der Navigation. Finaler Lauf: 68 bestandene Checks, 52 geblockte autonome WS-Schreibversuche,
+  sowie mutierende WS-Kommandos vor der Navigation. Finaler Inline-Lauf: 119 bestandene Checks, 34 geblockte autonome WS-Schreibversuche,
   0 HTTP-Schreibversuche, 0 PageErrors und 0 unhandled Rejections. Details
   stehen im privaten Report. Kein Dashboard-/Ressourcen-Save
   und keine echte Medienaktion gehören zu diesem Lauf.
@@ -40,7 +47,7 @@ wird unter 450 px zum mobilen Vollbild mit festen unteren Aktionen.
   bleiben außerhalb des Repositories.
 - **E07** `docs/render/visual-contract.py`: 28 Prüfgruppen bestanden, aktualisierte
   und angesehene synthetische Baselines für 320/390/480/960 in Hell/Dunkel.
-  Das neue editorseitige Seitengrößenfeld erweitert den Vertrag auf 21 Felder.
+  Das neue editorseitige Seitengrößenfeld erweitert den Vertrag auf 21 Felder. Im finalen Vergleich wurden 15 minimal abweichende Rasterpixel im Statusbadge von alle-480-dark.png lokal eingegrenzt; Geometrie unverändert, Bild angesehen und nur diese Baseline übernommen.
 - **E06** Zentrales `../docs/render/proben/scrim-probe.py`: acht Gegenproben,
   darunter geschützte und absichtlich verletzte Bearbeitung/Bestätigung,
   Altvertrag für Ansichten/Dirty-Formular und mobiles `kein_urteil`.
@@ -52,9 +59,9 @@ wird unter 450 px zum mobilen Vollbild mit festen unteren Aktionen.
 | R01 | erfüllt im Änderungsumfang | E01–E05: gleiche kompakten Primitives, DE/EN-Labels, Fehlerdarstellung und Importactions für Sonarr/Radarr. Individueller Titel bleibt erhalten. |
 | R02 | erfüllt im Änderungsumfang | E04: sichtbare Checkboxen, Ctrl/Cmd-Umschaltung, Shift-Bereich, Auswahlanzahl und Auswahlimport. Keine Sammelaktion für Medienwünsche erzwungen. |
 | R03 | teilweise | E03/E04: Enter an Suche/Ergebnis, native Buttons, Escape, Tab-Zyklus und Fokus. Keine aufklappbare Baumstruktur für Shift+Plus/Minus. Screenreaderprüfung fehlt. |
-| R04 | erfüllt im Änderungsumfang | E03/E04/E06: Außenklick ignoriert auch clean; dirty Escape/Back bietet Behalten/Verwerfen, Auswahl bleibt; Focus Trap/inert/Focus Return; laufende Aktion blockiert Abbruch. |
+| R04 | erfüllt im Änderungsumfang | E03/E04/E06: Außenklick ignoriert auch clean; Dateiauswahl: dirty Escape/Back bietet Behalten/Verwerfen; Inline-Staffeln: dirty Escape/Abbrechen schützt Auswahl; Focus Trap/inert/Focus Return; laufende Aktion blockiert Abbruch. |
 | R05 | teilweise | E03/E04: Back bleibt auf derselben Adresse, eigener Close entfernt aktiven History-Eintrag, Dirty Back schützt. HA-Deep-Link/Refresh/Forward-Routing ist Hostvertrag; kein eigener Kartenrouter. |
-| R06 | erfüllt im Änderungsumfang | E03–E05: 320/390/480/960 Hell/Dunkel, keine horizontale Scrollpflicht, sichtbare Touchaktionen mindestens 44 px; mobile Dialoge folgen HACS-Vollbildregel. Keine physische Companion-Geste gemessen. |
+| R06 | erfüllt im Änderungsumfang | E03–E05: 320/390/480/960 Hell/Dunkel, keine horizontale Scrollpflicht, sichtbare Touchaktionen mindestens 44 px; Staffeln inline und Kandidatendialog auch mobil inhaltshoch; Löschbestätigung folgt bestehender Vollbildregel. Keine physische Companion-Geste gemessen. |
 | R07 | nicht anwendbar | HA/Companion übernimmt PWA; kein eigenes Manifest oder Installationsversprechen. |
 | R08 | erfüllt im Änderungsumfang | E01/E03/E04: zentraler Dialog, errorMarkup, Status-/Bereitschaftslogik, gleicher API-Vertrag je Dienst; Geschäftslogik bleibt im Backend. |
 | R09 | teilweise | E02–E05: gemeinsame HA-Tokens, Shell, Status-/Actions, geprüfte Hell/Dunkel-Bilder. Keine vollständige Kontrastmessung jeder geerbten Hostfläche. |
@@ -71,8 +78,8 @@ wird unter 450 px zum mobilen Vollbild mit festen unteren Aktionen.
 | R20 | teilweise | E01/E04: Duplikatsperren und 5-Zeilen-Pagination begrenzen unnötige UI-Arbeit. Keine Web-Vitals-Feldmessung. Kandidateninspektion bewusst serverseitig. |
 | R21 | erfüllt im Änderungsumfang | E01/E04: Suchtext, Auswahl und Pagination bleiben bei Aktionen/Refresh soweit IDs weiterhin sicher bereit sind. Keine Speicherung sensibler Auswahl über HA-Neustart zugesagt. |
 | R22 | erfüllt im Änderungsumfang | E03–E05: Suche, Anfrage, Prüfen/Auswahl, Import, Bulk, Pagination und Löschabbruch sichtbar; Kernfunktionen nicht nur per Hover/Geste. |
-| R23 | erfüllt im Änderungsumfang | E03–E05: derselbe Dialog und dieselbe Validierung, Desktop kompakt/mobile Vollbild. |
-| R24 | erfüllt im Änderungsumfang | Ausnahmen R07/R15/R19 und Host-/Messgrenzen oben benannt; R04-Konflikt explizit aufgelöst. |
+| R23 | erfüllt im Änderungsumfang | E03–E05: dieselbe fachliche Validierung, Anfrage auf allen Breiten inline, Kandidatenprüfung kompakt mit Scroll bei langem Inhalt. |
+| R24 | erfüllt im Änderungsumfang | Ausnahmen R07/R15/R19 und Host-/Messgrenzen oben benannt; R04- und Mobile-Vollbild-/Plankonflikt explizit aufgelöst. |
 | R25 | teilweise | E02/E03: konfigurierte Titel/Instanz/Dienst/Refresh/Anzahl im vorhandenen ha-form-Editor samt DE/EN-Erklärung; kein neuer Editorflow, bestehende native Editor-Speicherprüfung nicht in diesem Änderungslauf wiederholt. |
 | R26 | erfüllt im Änderungsumfang | E01–E05: deutsche UI, DE/EN-Wörterbuch, Sonarr/Radarr/Seer und Quality/Language-Fachdaten bleiben verständlich; kein Raw-JSON im Standardinhalt. |
 

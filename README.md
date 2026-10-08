@@ -80,22 +80,23 @@ und einem roten *Löschen*.
 
 ## Anfragen mit Staffelauswahl
 
-![Dialog mit Staffelauswahl; verfügbare Staffeln sind gesperrt](docs/preview-seer.png)
+![Kompakte Inline-Staffelauswahl; verfügbare Staffeln sind gesperrt](docs/preview-seer.png)
 
-Ein Treffer öffnet einen Dialog. Bereits verfügbare Staffeln sind gesperrt und
+Ein Treffer blendet die Auswahl direkt unter seinem Ergebnis ein. Bereits verfügbare Staffeln sind gesperrt und
 markiert, fehlende sind vorbelegt — der häufigste Wunsch ist „alles, was noch
 fehlt". Bei Serien geht die Staffelliste **immer** mit; ohne sie antwortet
 Jellyseerr mit einem Fehler.
 
 ## Dialoge, die sich schließen lassen
 
-Jeder Dialog dieser Karten schließt auf **Escape**, auf einen Klick **neben**
-den Dialog und auf die **Zurück-Taste** des Browsers beziehungsweise die
-Zurück-Geste am Handy — ohne dabei das Dashboard zu verlassen. Dafür legt er
-beim Öffnen einen eigenen Verlaufseintrag an und nimmt ihn beim Schließen
-wieder mit; sein Schließ-Knopf hinterlässt also keinen verwaisten Eintrag.
-Unter 450 px Breite wird der Dialog Vollbild, die Aktionsknöpfe bleiben unten
-stehen.
+Bearbeitungs- und Bestätigungsdialoge bleiben bei Außenklick geöffnet.
+Escape, Schließen und Browser Zurück schließen sie; eine geänderte
+Dateiauswahl braucht zuvor ausdrücklich *Verwerfen*. Der Fokus bleibt im
+Dialog und kehrt zur auslösenden Karte zurück. Die Kandidatenprüfung bleibt
+auch mobil ein inhaltshohes Blatt; lange Diagnosen scrollen darin.
+Die Staffelwahl bleibt auf allen Breiten inline: *Abbrechen* und Escape
+schützen Änderungen mit *Weiter bearbeiten* oder *Verwerfen*. Sie erzeugt
+keinen zusätzlichen Browser-Verlaufseintrag.
 
 ## Mobil und im dunklen Thema
 
@@ -163,14 +164,14 @@ docker run --rm \
               /cards/docs/render/ergebnis'
 ```
 
-**Messumfang und Ergebnis** (`docs/render/ergebnis/report.json`, Exit 0):
+**Aktueller Messumfang** (lokaler Kandidat 0.5.0, Exit 0; private Artefakte, Zusammenfassung im [Abnahmebericht](docs/design-audit-2026-10-08-arrcompact.md)):
 
 | Was | Umfang | Ergebnis |
 | --- | --- | --- |
-| Regel 1, alle vier Karten | jede im vollen Zustand (die Anfrage-Karte mit Treffern, nicht leer): 320 / 480 / 960 px × hell / dunkel, je einmal mit und ohne die `--ha-space-*`-Variablen — 540 Textelemente | 0 Überlauf, 0 außerhalb der Karte, 0 Überlappung, 0 „kein Urteil"; 70 gewollte Kürzungen |
-| Regel 1 in jedem der drei Dialoge | dieselben sechs Fassungen je Dialog, Bezugsrechteck ist das Dialogblatt selbst — 114 Textelemente | 0 Verstöße, 0 „kein Urteil" |
-| Regel 2, drei Dialoge (Staffelauswahl, Dateien prüfen, Löschen bestätigen) | Escape · `history.back()` · Schließ-Knopf · `elementFromPoint` · Klick neben den Dialog | 15 von 15 bestanden |
-| Regel 2, zusätzlich | Breite 560/320 px, Vollbild unter 450 px, `z-index` | 560 / 320 px, Vollbild 320×1200, `z-index: 100000` |
+| Regel 1, alle vier Karten | volle Zustände: 320 / 390 / 480 / 960 px × hell / dunkel, mit und ohne HA-Tokens | 0 Textverstöße |
+| Regel 1, Staffelwahl inline und zwei Dialoge | dieselben Breiten/Themes; Bezug Karte bzw. Dialogblatt | 0 Textverstöße |
+| Regel 2, Dateien prüfen und Löschen bestätigen | Escape · Browser Back · Schließen · Stacking · geschützter Außenklick | 10 von 10 bestanden |
+| Native kompakte UI | 119 Checks, Inline-Fokus/Dirty/Retry, Movie/TV-ID-Gegenprobe, Kandidaten-/Importverträge | alle bestanden, 0 Browserfehler; WS/HTTP-Schreibschutz vor Navigation |
 | Regel 3 am echten Editor | jedes Schemafeld jeder Karte, deutsch und englisch | kein Feld ohne Beschriftung, keines ohne Helper, beide Sprachen verschieden |
 | Regel 4 | `scripts/ui-regeln-pruefen.py --repo ha-arrstack-cards` | 0 Verstöße |
 | Netz | jede Anfrage protokolliert | 3 Anfragen, 0 Fehlantworten, 0 Konsolenfehler, 0 Seitenfehler, kein Nachladen aus einem Unterordner |
@@ -292,7 +293,7 @@ Keine produktiven Geräteaktionen wurden für die Abnahme ausgeführt.
 
 ### Lokal geprüft am 08.10.2026 · Kandidat 0.5.0 (unveröffentlicht)
 
-Seer zeigt kompakte Treffer mit tatsächlichen Staffeln, klaren Fehlern und
+Seer zeigt kompakte Treffer mit tatsächlichen Staffeln direkt im Ergebnis, klaren Fehlern und
 Retry; technische Details bleiben eingeklappt. Sonarr/Radarr nutzen dieselben
 Backend-Actions für Kandidatenprüfung, expliziten Einzelimport und sichere
 Sammelimporte. Aktive Downloads zeigen keinen Kandidatenstatus. Die Queue
@@ -305,7 +306,7 @@ prüft vor jedem Import frisch. Eine abweichende Kandidatenantwort aktualisiert
 auch den offenen Dialog; stale Auswahl wird nicht weiter als bereit angezeigt.
 
 Bearbeitungs-/Bestätigungsdialoge ignorieren Außenklick. Escape/Zurück/Abbrechen
-schützen geänderte Auswahl mit explizitem Verwerfen; Fokus bleibt im Dialog
+schützen geänderte Dateiauswahl mit explizitem Verwerfen; Fokus bleibt im Dialog
 und kehrt zurück. Details und Einträge bleiben bei einem Fehler erhalten.
 
 Parser-/Editor-/Importregressionen und statische UI-Prüfung bestanden. Echter

@@ -85,26 +85,27 @@ try:
                 page.evaluate("""async () => {const card=window.__cards.seer;
                   await card._openResult(card._results[0])}""")
                 dialog = page.evaluate("""() => {
-                  const root=document.querySelector('arrstack-dialog').shadowRoot;
-                  return [...root.querySelectorAll('.dlg-close,.dlg-foot button,.season')]
+                  const root=window.__cards.seer.shadowRoot.querySelector('.request-inline');
+                  return [...root.querySelectorAll('.inline-actions button,.season')]
                     .map(button=>({kind:button.className,
                       width:Math.round(button.getBoundingClientRect().width),
                       height:Math.round(button.getBoundingClientRect().height)}));
                 }""")
-                checks[f"dialog_actions-{width}-{theme}"] = dialog
+                checks[f"inline_actions-{width}-{theme}"] = dialog
                 if any(button["height"] < 44 or (button["kind"] == "dlg-close" and button["width"] < 44)
                        for button in dialog):
-                    findings.append(f"Dialog {width}/{theme}: Aktionsfläche zu klein: {dialog}")
+                    findings.append(f"Inline-Auswahl {width}/{theme}: Aktionsfläche zu klein: {dialog}")
+                page.wait_for_function("!!window.__cards.seer.shadowRoot.activeElement?.closest('.request-inline')")
                 page.keyboard.press("Escape")
-                page.wait_for_function("!document.querySelector('arrstack-dialog')")
+                page.wait_for_function("!window.__cards.seer._show")
         keyboard = page.evaluate("""() => {const row=window.__cards.seer.shadowRoot.querySelector('.result');
           row.focus();row.dispatchEvent(new KeyboardEvent('keydown',
             {key:'Enter',bubbles:true,composed:true,cancelable:true}));
           return {role:row.getAttribute('role'),tabIndex:row.tabIndex};}""")
-        page.wait_for_function("!!document.querySelector('arrstack-dialog')")
+        page.wait_for_function("!!window.__cards.seer.shadowRoot.activeElement?.closest('.request-inline')")
         keyboard["opened"] = True
         page.keyboard.press("Escape")
-        page.wait_for_function("!document.querySelector('arrstack-dialog')")
+        page.wait_for_function("!window.__cards.seer._show")
         checks["keyboard_result"] = keyboard
         if keyboard["role"] != "button" or keyboard["tabIndex"] != 0:
             findings.append(f"Suchergebnis nicht per Tastatur erreichbar: {keyboard}")

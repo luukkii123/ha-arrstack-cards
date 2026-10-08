@@ -16,8 +16,7 @@ Gemessen wird gegen `hacs/docs/ui-regeln.md`:
   960 px, im hellen und im dunklen Thema — und das doppelt: einmal mit den
   HA-Abstandsvariablen (`--ha-space-*`), einmal ohne, also auf dem
   Rückfallpfad. Beide Fassungen kommen bei einem Nutzer vor, je nach Theme.
-* **Regel 2** (`regeln.messe_popup`) an **drei** Dialogen: der Staffelauswahl
-  der Seerr-Karte, dem Prüfergebnis der Reparatur-Karte und der Rückfrage vor
+* **Regel 2** (`regeln.messe_popup`) an **zwei** Dialogen: dem Prüfergebnis der Reparatur-Karte und der Rückfrage vor
   dem Löschen. Die Messung öffnet sie über denselben Weg, den ein Nutzer
   nimmt.
 
@@ -26,7 +25,7 @@ Gemessen wird gegen `hacs/docs/ui-regeln.md`:
   das ganze Fenster: die Scrim-Messung fände keinen Punkt „neben" dem Popup
   und bliebe ohne Urteil, und Regel 1, Prüfung 2 („liegt im Rechteck") wäre
   am Dialog leer, weil alles im Fenster liegt.
-* **Regel 1 in jedem der drei Dialoge**: derselbe Texttest mit `.sheet` als
+* **Regel 1 in jedem der zwei Dialoge**: derselbe Texttest mit `.sheet` als
   Bezug, ebenfalls bei allen drei Breiten in beiden Themen. Bezugsrechteck
   ist damit das Blatt selbst; ein Text, der darüber hinausragt, wird gemeldet.
   `messe_popup` misst nur Regel 2; ein geöffnetes Popup bliebe für Regel 1
@@ -313,6 +312,7 @@ def dialog_offen(page):
 
 def alles_zu(page):
     """Vor jeder Messung: kein Dialog offen, kein Verlaufseintrag hängen."""
+    page.evaluate("() => {if (window.__cards?.seer._show) window.__cards.seer._closeInline(true);}")
     for _ in range(4):
         if not dialog_offen(page):
             return
@@ -409,6 +409,12 @@ try:
         page.wait_for_timeout(300)
         selbst = regeln.selbsttest(page, "arrstack-downloads-card")
 
+        # Die Staffelwahl ist Inhalt der Karte, kein Popup; an denselben Breiten messen.
+        page.evaluate("async()=>{const c=window.__cards.seer;await c._openResult(c._results[0]);}")
+        ui_inline = regeln.lauf_breiten(page, breiten=(320,390,480,960),
+            messung=lambda p: regeln.messe_text(p, "arrstack-seer-card"))
+        page.evaluate("()=>window.__cards.seer._closeInline(true)")
+
         # ── Regel 2 an den drei Dialogen ─────────────────────────────────────
         # Alle drei sind `arrstack-dialog` und liegen am document.body; die
         # Karten tragen `container-type: inline-size`, also `contain: layout`,
@@ -419,17 +425,6 @@ try:
         page.set_viewport_size({"width": 960, "height": 1200})
         page.wait_for_timeout(200)
         alles_zu(page)
-        popups["seer_staffeln"] = regeln.messe_popup(
-            page,
-            oeffnen=lambda: page.evaluate("""async () => {
-                const c = window.__cards.seer;
-                await c._search('beispiel');
-                const row = c.shadowRoot.querySelector('.result');
-                if (row) row.click();
-            }"""),
-            popup_selektor=".sheet",
-            schliessen_knopf_selektor=".dlg-close", dialog_typ="bearbeitung")
-
         alles_zu(page)
         popups["fix_pruefen"] = regeln.messe_popup(
             page,
@@ -460,12 +455,6 @@ try:
         # Je Dialog eine Öffnerfunktion; `vor_messung` sorgt dafür, dass er
         # nach jeder Größenänderung wieder offen ist.
         OEFFNER = {
-            "seer_staffeln": """async () => {
-                const c = window.__cards.seer;
-                if (!c._results) await c._search('beispiel');
-                const row = c.shadowRoot.querySelector('.result');
-                if (row) row.click();
-            }""",
             "fix_pruefen": """async () => {
                 const b = window.__cards.fix.shadowRoot.querySelector('.act-check');
                 if (b) b.click();
@@ -483,7 +472,7 @@ try:
                     p.wait_for_timeout(500)
             return auf
 
-        dialog_auf = macher(OEFFNER["seer_staffeln"])
+        dialog_auf = macher(OEFFNER["fix_pruefen"])
 
         ui_dialog = {}
         for name, js in OEFFNER.items():
@@ -504,7 +493,7 @@ try:
             page.evaluate("(t) => { document.documentElement.dataset.theme = t; }", thema)
             dialog_auf(page)
             page.wait_for_timeout(300)
-            page.screenshot(path=str(OUT / f"dialog-seer-{breite}-{thema}.png"))
+            page.screenshot(path=str(OUT / f"dialog-import-{breite}-{thema}.png"))
         alles_zu(page)
 
         page.set_viewport_size({"width": WIDTH, "height": 1200})
@@ -538,9 +527,7 @@ try:
         page.wait_for_timeout(200)
         laenge_vorher = page.evaluate("() => history.length")
         page.evaluate("""async () => {
-            const c = window.__cards.seer;
-            await c._search('beispiel');
-            const row = c.shadowRoot.querySelector('.result');
+            const row = window.__cards.fix.shadowRoot.querySelector('.act-check');
             if (row) row.click();
         }""")
         page.wait_for_timeout(400)
@@ -570,7 +557,7 @@ try:
         page.set_viewport_size({"width": 320, "height": 1200})
         page.wait_for_timeout(200)
         dialog_auf(page)
-        eigen["vollbild_320"] = page.evaluate("""() => {
+        eigen["kompakt_320"] = page.evaluate("""() => {
             const d = document.querySelector('arrstack-dialog');
             const r = d.shadowRoot.querySelector('.sheet').getBoundingClientRect();
             return { breite: Math.round(r.width), hoehe: Math.round(r.height),
@@ -723,10 +710,12 @@ report = {
     "ui_regeln_ohne_ha_tokens": ui_ohne_tokens,
     "ui_regeln_mit_ha_tokens": ui_mit_tokens,
     "ui_regeln_dialog": ui_dialog,
+    "ui_regeln_inline": ui_inline,
     "ui_zaehlung": {
         "karten_ohne_ha_tokens": regeln.zaehle(ui_ohne_tokens),
         "karten_mit_ha_tokens": regeln.zaehle(ui_mit_tokens),
         "dialog": regeln.zaehle(ui_dialog),
+        "inline": regeln.zaehle(ui_inline),
     },
     "ui_selbsttest": selbst,
     "ui_popups": popups,
@@ -748,7 +737,7 @@ print("Eigene Prüfungen:", json.dumps(
                           == eigen.get("scrim", {}).get("history_length_nachher"),
      "sheet_960": eigen.get("breit_960", {}).get("sheetBreite"),
      "z_index": eigen.get("breit_960", {}).get("zIndex"),
-     "vollbild_320": eigen.get("vollbild_320"),
+     "kompakt_320": eigen.get("kompakt_320"),
      "bestaetigung_breite": eigen.get("bestaetigung_960", {}).get("sheetBreite"),
      "editor_ohne_label": {k: v["ohneLabel"] for k, v in eigen.get("editoren", {}).items()},
      "editor_ohne_helper": {k: v["ohneHelper"] for k, v in eigen.get("editoren", {}).items()},
@@ -764,7 +753,7 @@ print("Netz:", len(requests), "Anfragen,",
 # am Werkzeug, nicht ein Befund an der Karte. Schlägt er nicht an oder meldet
 # er eine gewollte Kürzung, taugt der ganze Lauf nichts; dann ebenfalls Exit 1.
 schlecht = (regeln.bewerte(ui_ohne_tokens) or regeln.bewerte(ui_mit_tokens)
-            or regeln.bewerte(ui_dialog) or regeln.bewerte(popups))
+            or regeln.bewerte(ui_dialog) or regeln.bewerte(ui_inline) or regeln.bewerte(popups))
 if not (selbst["ueberlauf_erkannt"] and selbst["ausserhalb_erkannt"]):
     print("FEHLER: Die Gegenprobe hat nicht angeschlagen — die Messung ist blind.")
     schlecht = 1
@@ -786,9 +775,9 @@ if eigen.get("breit_960", {}).get("sheetBreite", 9999) > 560:
 if eigen.get("bestaetigung_960", {}).get("sheetBreite", 9999) > 320:
     print("FEHLER: Der Bestätigungsdialog ist breiter als 320 px.")
     schlecht = 1
-vb = eigen.get("vollbild_320", {})
-if vb and (vb["breite"] < vb["viewportBreite"] or vb["hoehe"] < vb["viewportHoehe"]):
-    print("FEHLER: Unter 450 px ist der Dialog nicht Vollbild.")
+vb = eigen.get("kompakt_320", {})
+if vb and (not 0 < vb["breite"] < vb["viewportBreite"] or not 0 < vb["hoehe"] < vb["viewportHoehe"]):
+    print("FEHLER: Kandidatenprüfung bleibt nicht kompakt innerhalb des Viewports.")
     schlecht = 1
 for karte, befund in eigen.get("editoren", {}).items():
     if befund["ohneLabel"] or befund["ohneHelper"]:

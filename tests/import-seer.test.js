@@ -37,6 +37,21 @@ async function run() {
  assert.equal(requests,1,'langsame Suche verhindert doppelte Requests');
  resolveSearch({results:[]});await firstSearch;
  assert.equal(seer._query,'a & ü','normale Suchzeichen bleiben erhalten');
+ seer._show={id:7,media_type:'tv',title:'Serie',seasons:[{season:1,episodes:8}]};
+ seer._results=[seer._show];seer._error=null;seer._selected=new Set([1]);
+ seer._oeffneDialog=()=>{throw new Error('Staffelauswahl muss inline bleiben');};
+ seer._oeffneDetail();
+ assert(seer._body().includes('request-inline'),'Staffeln im Karteninhalt statt Vollbild');
+ assert(seer._body().includes('data-inline-action="request"'),'sichtbare Anfrageaktion inline');
+ seer._results.push({...seer._show,media_type:'movie'});
+ assert.equal((seer._body().match(/class="request-inline"/g)||[]).length,1,'Movie/TV gleicher TMDB-ID bleiben getrennt');
+ seer._busy=true;
+ assert(seer._dialogKoerper().match(/<button[^>]*data-season="1"[^>]*>/)[0].includes('disabled'),'Staffelchips bei Request busy deaktiviert');
+ seer._busy=false;
+ seer._selected.clear();seer._closeInline();
+ assert(seer._discardInline,'Dirty Escape/Abbruch braucht ausdrückliche Wahl');
+ assert(seer._show,'Entwurf bleibt erhalten');
+ seer._closeInline(true);assert.equal(seer._show,null);
  console.log('Import-/Seer-Vertrag bestanden');
 }
 run().catch(e=>{console.error(e);process.exitCode=1;});

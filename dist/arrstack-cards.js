@@ -1143,6 +1143,32 @@ const ARRSTACK_STYLES = BuschUI.cardStyles + ARRSTACK_TOKENS + ARRSTACK_EINZEILI
 
 /** Compact request/import variants preserve the shared dashboard shell. */
 const ARRSTACK_COMPACT = `
+  /* Staffelauswahl der Seerr-Karte. Sie steht inline, gehört aber
+     hierher und nicht in einen Stilblock mitten im Inhalt: ein Stilblock im
+     Körper würde bei jedem Nachzeichnen neu geparst. */
+  .seasons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--arr-space-2);
+    margin-top: var(--arr-space-3);
+  }
+  .season {
+    font-size: var(--arr-font-sm);
+    padding: var(--arr-space-1) var(--arr-space-3);
+    border-radius: var(--arr-radius-2);
+    background: var(--arr-surface);
+    color: var(--arr-muted);
+  }
+  /* Gewählte Staffeln sind ein Zustand, keine zweite Hauptaktion: getönt
+     statt gefüllt. Gefüllt bleibt allein der Anfragen-Knopf. */
+  .season[aria-pressed="true"] {
+    background: color-mix(in srgb, var(--arr-accent) 18%, transparent);
+    color: var(--arr-accent);
+    font-weight: var(--arr-weight-bold);
+  }
+  .season[disabled] { cursor: default; opacity: 0.55; }
+
+
   .head { margin-bottom: var(--arr-space-3); }
   .title { font-size: var(--arr-font-md); }
   .status-badge, .status-badge.success, .status-badge.warning, .status-badge.error,
@@ -1268,31 +1294,6 @@ const DIALOG_STYLES = ARRSTACK_TOKENS + ARRSTACK_EINZEILIG + ARRSTACK_GEMEINSAM 
     flex: none;
   }
 
-  /* Staffelauswahl der Seerr-Karte. Sie steht nur im Dialog, gehört aber
-     hierher und nicht in einen Stilblock mitten im Inhalt: ein Stilblock im
-     Körper würde bei jedem Nachzeichnen neu geparst. */
-  .seasons {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--arr-space-2);
-    margin-top: var(--arr-space-3);
-  }
-  .season {
-    font-size: var(--arr-font-sm);
-    padding: var(--arr-space-1) var(--arr-space-3);
-    border-radius: var(--arr-radius-2);
-    background: var(--arr-surface);
-    color: var(--arr-muted);
-  }
-  /* Gewählte Staffeln sind ein Zustand, keine zweite Hauptaktion: getönt
-     statt gefüllt. Gefüllt bleibt allein der Anfragen-Knopf. */
-  .season[aria-pressed="true"] {
-    background: color-mix(in srgb, var(--arr-accent) 18%, transparent);
-    color: var(--arr-accent);
-    font-weight: var(--arr-weight-bold);
-  }
-  .season[disabled] { cursor: default; opacity: 0.55; }
-
   /* Unter 450 px Breite oder 500 px Höhe: Vollbild. */
   @media (max-width: 450px), (max-height: 500px) {
     .sheet, .sheet.schmal {
@@ -1306,6 +1307,15 @@ const DIALOG_STYLES = ARRSTACK_TOKENS + ARRSTACK_EINZEILIG + ARRSTACK_GEMEINSAM 
       border-radius: 0;
     }
   }
+  @media (max-width: 450px), (max-height: 500px) {
+    .sheet.kompakt {
+      left: var(--arr-space-2); right: var(--arr-space-2);
+      top: 50%; bottom: auto; transform: translateY(-50%);
+      width: auto; max-height: calc(100dvh - 4 * var(--arr-space-2));
+      border-radius: var(--arr-radius-2);
+    }
+  }
+
 `;
 
 /** Ein Dialog nach der Anatomie aus `docs/ui-regeln.md`, Regel 2.
@@ -1435,7 +1445,7 @@ class ArrstackDialog extends HTMLElement {
     ] : model.aktionen || [];
     this.shadowRoot.innerHTML = `<style>${DIALOG_STYLES}</style>
       <div class="scrim"></div>
-      <div class="sheet ${model.schmal ? "schmal" : ""}" role="dialog" aria-modal="true"
+      <div class="sheet ${model.schmal ? "schmal" : ""} ${model.kompakt ? "kompakt" : ""}" role="dialog" aria-modal="true"
         aria-label="${escapeHtml(model.titel)}">
         <div class="dlg-head">
           <button class="dlg-close" aria-label="${escapeHtml(model.schliessen)}"
@@ -2220,7 +2230,7 @@ class ArrstackFixCard extends ArrstackCardBase {
     this._open = {queue_item_id:queueItemId,loading:true,candidate_id:null};
     const t = this._t();
     const dialog = this._oeffneDialog({
-      titel:t.dialog_pruefen,schliessen:t.schliessen,
+      titel:t.dialog_pruefen,schliessen:t.schliessen,kompakt:true,
       dirty:()=>!!this._open?.candidate_id,busy:()=>!!this._busy,
       koerper:()=>this._dialogKoerper(),aktionen:this._dialogAktionen(),
       binden:(root,dlg)=>root.querySelectorAll(".candidate-radio").forEach(input=>input.addEventListener("change",()=>{
@@ -2371,6 +2381,8 @@ class ArrstackSeerCard extends ArrstackCardBase {
   _render() {
     if (!this._config) return;
     const t = this._t();
+    const active = this.shadowRoot.activeElement;
+    const focusSelector = active?.dataset.season ? `.season[data-season="${active.dataset.season}"]` : active?.dataset.inlineAction ? `[data-inline-action="${active.dataset.inlineAction}"]` : null;
     this.shadowRoot.innerHTML = `<style>${ARRSTACK_STYLES}${ARRSTACK_COMPACT}
       .search { display: flex; gap: var(--arr-space-2); margin-bottom: var(--arr-space-4); }
       .search input {
@@ -2387,19 +2399,22 @@ class ArrstackSeerCard extends ArrstackCardBase {
       }
       .search .go { flex: 0 0 44px; width: 44px; justify-content: center; padding: 0; }
       .row.result { cursor: pointer; min-height: 66px; }
+      .request-inline { padding: var(--arr-space-3); background: var(--arr-surface); }
+      .inline-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--arr-space-2); margin-top: var(--arr-space-3); }
       </style>
       <ha-card>
         ${this._head("jellyfish", this._searching ? t.laden : this._results?.length ? fuelle(t.treffer,{n:this._results.length}) : t.bereit, "neutral")}
         <div class="search">
           <input type="search" placeholder="${escapeHtml(t.platzhalter)}"
-            value="${escapeHtml(this._query)}" aria-label="${escapeHtml(t.suchbegriff)}">
+            value="${escapeHtml(this._query)}" aria-label="${escapeHtml(t.suchbegriff)}" ${this._show ? "disabled" : ""}>
           <button class="go quiet" aria-label="${escapeHtml(t.suchen)}"
-            title="${escapeHtml(t.suchen)}" ${this._searching || this._opening ? "disabled" : ""}>${arrIcon("search")}</button>
+            title="${escapeHtml(t.suchen)}" ${this._searching || this._opening || this._show ? "disabled" : ""}>${arrIcon("search")}</button>
         </div>
         ${this._message ? `<div class="notice">${escapeHtml(this._message)}</div>` : ""}
         ${this._body()}
       </ha-card>`;
     this._bind();
+    if (focusSelector) setTimeout(()=>this.shadowRoot.querySelector(focusSelector)?.focus(),0);
   }
 
   _body() {
@@ -2432,12 +2447,12 @@ class ArrstackSeerCard extends ArrstackCardBase {
             )}</div>
           </div>
           <span class="status-badge ${seerTone(item.status)}">${escapeHtml(statusLabel(item.status, t))}</span>
-        </div>`
+        </div>${this._show?.id === item.id && this._show?.media_type === item.media_type ? this._inlineMarkup() : ""}`
       )
       .join("")}</div>`;
   }
 
-  /** Dialoginhalt: bei Serien die Staffeln, bei Filmen nur der Titel. */
+  /** Inline-Inhalt: Titel und Poster stehen bereits im zugehörigen Treffer. */
   _dialogKoerper() {
     const t = this._t();
     const show = this._show;
@@ -2450,19 +2465,13 @@ class ArrstackSeerCard extends ArrstackCardBase {
         const label =
           season.season === 0 ? t.specials : fuelle(t.staffel, { n: season.season });
         return `<button class="season" data-season="${season.season}"
-          aria-pressed="${pressed}" ${available ? "disabled" : ""}
+          aria-pressed="${pressed}" ${available || this._busy ? "disabled" : ""}
           title="${escapeHtml(available ? fuelle(t.staffel_da, { name: label }) : label)}">
           <span class="lbl">${escapeHtml(label)}</span>${available ? arrIcon("check", 14) : ""}
         </button>`;
       })
       .join("");
-    return `${this._requestError ? this._errorMarkup(this._requestError, t.fehler_allgemein,false) : ""}<div class="row">
-        ${posterMarkup(show.poster)}
-        <div class="row-main">
-          <div class="row-title">${escapeHtml(show.title || "")}</div>
-          <div class="row-meta">${escapeHtml(statusLabel(show.status, t))}</div>
-        </div>
-      </div>
+    return `${this._requestError ? this._errorMarkup(this._requestError, t.fehler_allgemein,false) : ""}
       ${seasons.length ? `<div class="seasons">${chips}</div>` : ""}`;
   }
 
@@ -2474,41 +2483,56 @@ class ArrstackSeerCard extends ArrstackCardBase {
     ];
   }
 
-  /** Der Dialog bringt eigene Formen mit — er liegt außerhalb der Karte. */
+  /** Kompakte Auswahl im Ergebnis: kein Overlay oder zusätzlicher Historyeintrag. */
   _oeffneDetail() {
-    const t = this._t();
     this._initialSelection = [...this._selected].sort((a,b)=>a-b).join(",");
-    return this._oeffneDialog({
-      dirty:()=>[...this._selected].sort((a,b)=>a-b).join(",") !== this._initialSelection,
-      busy:()=>this._busy,
-      titel: t.dialog_anfragen,
-      schliessen: t.schliessen,
-      koerper: () => this._dialogKoerper(),
-      aktionen: this._dialogAktionen(),
-      binden: (root, dialog) => {
-        root.querySelectorAll(".season").forEach((chip) => {
-          chip.addEventListener("click", () => {
-            const season = Number(chip.dataset.season);
-            if (this._selected.has(season)) this._selected.delete(season);
-            else this._selected.add(season);
-            dialog.model = {...dialog._model,aktionen:this._dialogAktionen()};
-          });
-        });
-      },
-      beiAktion: (id, dialog) => {
-        if (id === "request") {
-          this._request(dialog);
-          return;
-        }
-        dialog.close();
-      },
-      beimSchliessen: () => {
-        this._show = null;
-      },
-    });
+    this._discardInline = false;
+    this._render();
+    setTimeout(()=>this.shadowRoot.querySelector(".request-inline button:not([disabled])")?.focus(),0);
+  }
+
+  _closeInline(force = false) {
+    if (this._busy && !force) return;
+    if (!force && [...this._selected].sort((a,b)=>a-b).join(",") !== this._initialSelection) {
+      this._discardInline = true;
+      this._render();
+      setTimeout(()=>this.shadowRoot.querySelector('[data-inline-action="keep"]')?.focus(),0);
+      return;
+    }
+    const id = this._show?.id, mediaType = this._show?.media_type;
+    this._show = null;
+    this._discardInline = false;
+    this._render();
+    const index = this._results?.findIndex(item=>item.id === id && item.media_type === mediaType);
+    setTimeout(()=>this.shadowRoot.querySelector(`.result[data-index="${index}"]`)?.focus(),0);
+  }
+
+  _inlineMarkup() {
+    const t = this._t();
+    if (this._discardInline) return `<section class="request-inline" aria-label="${escapeHtml(t.aenderungen)}">
+      <div class="notice">${escapeHtml(t.aenderungen_hinweis)}</div>
+      <div class="inline-actions"><button class="quiet" data-inline-action="keep">${escapeHtml(t.behalten)}</button>
+      <button class="quiet" data-inline-action="discard">${escapeHtml(t.verwerfen)}</button></div></section>`;
+    return `<section class="request-inline" aria-label="${escapeHtml(t.dialog_anfragen)}">
+      ${this._dialogKoerper()}<div class="inline-actions">${this._dialogAktionen().map(action=>
+        `<button class="${action.art}" data-inline-action="${action.id}" ${action.aus ? "disabled" : ""}>${escapeHtml(action.text)}</button>`).join("")}</div></section>`;
   }
 
   _bind() {
+    this.shadowRoot.querySelector(".request-inline")?.addEventListener("keydown",event=>{
+      if (event.key === "Escape") {event.preventDefault();event.stopPropagation();this._closeInline();}
+    });
+    this.shadowRoot.querySelectorAll(".season").forEach(chip=>chip.addEventListener("click",()=>{
+      const season=Number(chip.dataset.season);
+      if (this._selected.has(season)) this._selected.delete(season); else this._selected.add(season);
+      this._render();setTimeout(()=>this.shadowRoot.querySelector(`.season[data-season="${season}"]`)?.focus(),0);
+    }));
+    this.shadowRoot.querySelectorAll("[data-inline-action]").forEach(button=>button.addEventListener("click",()=>{
+      const action=button.dataset.inlineAction;
+      if (action === "request") this._request();
+      else if (action === "keep") {this._discardInline=false;this._render();setTimeout(()=>this.shadowRoot.querySelector(".season:not([disabled]), [data-inline-action=request]")?.focus(),0);}
+      else this._closeInline(action === "discard");
+    }));
     const input = this.shadowRoot.querySelector("input");
     if (input) {
       input.addEventListener("input",()=>{this._query=input.value;});
@@ -2531,7 +2555,7 @@ class ArrstackSeerCard extends ArrstackCardBase {
   }
 
   async _search(query) {
-    if (this._searching || this._opening) return;
+    if (this._searching || this._opening || this._show) return;
     this._query = String(query || "").trim();
     if (!this._query) return;
     this._message = null; this._error = null;
@@ -2548,6 +2572,7 @@ class ArrstackSeerCard extends ArrstackCardBase {
 
   async _openResult(item) {
     if (!item || this._opening || this._busy) return;
+    if (this._show) { this._closeInline(); return; }
     this._requestError = null;
     this._message = null;
     if (item.media_type === "movie") {
@@ -2567,6 +2592,7 @@ class ArrstackSeerCard extends ArrstackCardBase {
           .map((season) => season.season)
       );
       this._show = { ...show, media_type: "tv", id: item.id };
+      this._opening = false;
       this._error = null;
       this._oeffneDetail();
       return;
@@ -2576,7 +2602,11 @@ class ArrstackSeerCard extends ArrstackCardBase {
     this._render();
   }
 
-  async _request(dialog) {
+  async _request(dialog = null) {
+    if (!dialog) {
+      const card = this;
+      dialog = {get isConnected(){return !!card._show;},get _model(){return {};},set model(value){card._render();},close(){card._closeInline(true);}};
+    }
     const t = this._t(), show = this._show;
     if (!show || this._busy) return;
     const seasons=[...this._selected].sort((a,b)=>a-b);
