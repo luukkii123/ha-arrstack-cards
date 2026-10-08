@@ -315,3 +315,22 @@ browserlokal im echten HA-Frontend mit synthetischen Medienantworten und
 Schreibsperre. Die [26-Regel-Matrix](docs/design-audit-2026-10-08-arrcompact.md)
 nennt Belege und die verbleibenden Host-/Screenreader-/Zoom-/Feldmessgrenzen.
 Veröffentlichung und tatsächlich installierter Stand werden separat geprüft.
+
+### Geprüft — 08.10.2026 · 0.5.1
+
+Fertige blockierte Sonarr-/Radarr-Downloads bieten nun direkt in der
+Warteschlange **Dateien prüfen**. Es öffnet sich der vorhandene geschützte
+Importdialog; der Prüfknopf importiert nichts. Aktive Downloads, gerundete
+100 % mit Restbytes und SABnzbd bleiben ohne Importaktion. Die separate
+Fix-Karte bleibt für Auswahl und Sammelimporte verfügbar.
+
+Queue und Fix-Karte verwenden denselben Importcontroller. Der Dialog hält
+seine Instanz fest, bewahrt Änderungen bei Fehlern und bleibt während einer
+langsamen Queue-Aktualisierung gesperrt. Polling und erfolgreiche Imports
+geben den Tastaturfokus sinnvoll zurück.
+
+Node-/Editor-/Importregressionen, vollständiger Kartenrenderer und native
+synthetische Queueprüfung sind im [Abnahmebericht](docs/abnahme-2026-10-08-queue-dialog.md)
+mit der 26-Regel-Matrix dokumentiert. Keine produktive Medienaktion wurde
+für diese Prüfung ausgeführt. Veröffentlichung und Installation folgen
+separat über die Koordination.

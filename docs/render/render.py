@@ -178,6 +178,9 @@ PAGE = """<!doctype html>
     { id: 3, download_id: 'c3', title: 'Kurzfilm.2024.720p', parent_title: 'Kurzfilm',
       episode: null, poster: null, size: 9.0e8, sizeleft: 0, timeleft: null,
       progress: 100, status: 'completed', tracked_state: 'importing', messages: [] },
+    { id:41, title:LANG, parent_title:'Beispielserie mit einem ungewoehnlich langen Namen',
+      episode:'S01E09',poster:null,size:2.1e9,sizeleft:0,timeleft:null,
+      progress:100,status:'completed',tracked_status:'warning',tracked_state:'importBlocked',is_problem:true,messages:[] },
   ];
 
   const candidate = (id) => ({candidate_id: String(id),valid:true,

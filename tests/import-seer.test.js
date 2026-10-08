@@ -25,6 +25,28 @@ async function run() {
  assert.equal(fix._open.import_state,'no_match','frisches skipped ersetzt alten ready Stand');
  assert.equal(fix._open.candidate_id,null,'veraltete Dateiauswahl verworfen');
  assert.equal(fix._dialogAktionen().find(action=>action.id==='import').aus,true,'kein Importknopf bei no_match');
+ const downloads=new (types.get('arrstack-downloads-card'))();downloads._config={};downloads._hass={locale:{language:'de'}};downloads._data={service:'sonarr'};
+ const blocked={id:71,title:'Blockierter Download',status:'completed',tracked_status:'warning',tracked_state:'importBlocked',is_problem:true,sizeleft:0,progress:100};
+ assert(downloads._row(blocked).includes('act-check'),'fertiger blockierter Download bietet Dateien prüfen');
+ for(const item of [{...blocked,progress:99},{...blocked,progress:99.9,sizeleft:1},{...blocked,status:'downloading'},{...blocked,sizeleft:1},{...blocked,sizeleft:null},{...blocked,is_problem:false}])
+   assert(!downloads._row(item).includes('act-check'),'unfertig/gerundete100/fehlendeRestgröße/keinProblem bietet keine Importaktion');
+ downloads._data.service='sabnzbd';assert(!downloads._row(blocked).includes('act-check'),'SABnzbd bietet keinen Arr-Import');
+ downloads._data.service='radarr';assert(downloads._row(blocked).includes('Dateien prüfen'),'Radarr nutzt dieselbe Aktion');
+ downloads._busy='arrstack/import_item';assert(downloads._row(blocked).match(/<button[^>]*act-check[^>]*>/)[0].includes('disabled'),'Busy sperrt erneute Prüfung');downloads._busy=null;
+ assert.equal(downloads._check,fix._check,'derselbe Einzelimport-Controller für Queue und Fixkarte');
+ const readCalls=[];downloads._oeffneDialog=model=>({isConnected:true,_model:model});
+ downloads._call=async(type,params)=>{readCalls.push({type,...params});return {...ready,queue_item_id:71,candidates:[]};};
+ await downloads._check(71);
+ assert.equal(readCalls.length,1);assert.equal(readCalls[0].type,'arrstack/inspect_import','Queueprüfung schreibt/importiert nicht');
+ assert.equal(readCalls[0].queue_item_id,71,'Queue-ID wird statt Dateiname verwendet');
+ const routeCalls=[];delete downloads._call;downloads._config={entry_id:'entry-a'};
+ assert(downloads._row(blocked).includes('act-check'),'Entry-only Karte nutzt Dienst aus Queueantwort');
+ downloads._render=()=>{};downloads._load=async()=>{};
+ downloads._hass={locale:{language:'de'},callWS:async msg=>{routeCalls.push(msg);return {...ready,queue_item_id:71,status:'skipped',candidates:[]};}};
+ await downloads._check(71);
+ downloads._config={entry_id:'entry-b'};
+ await downloads._import(71,null,{isConnected:true,_model:{},close(){}});
+ assert(routeCalls.every(msg=>msg.entry_id==='entry-a'),'Instanzwechsel darf alten Dialog nicht auf gleiche QueueID anderer Instanz umlenken');
  const seer=new (types.get('arrstack-seer-card'))();seer._config={};seer._hass={locale:{language:'de'}};
  seer._error={message:'HTTP 400: {"secret":"backend JSON"}'};
  assert(!seer._body().split('<details')[0].includes('backend JSON'),'Rohfehler standardmäßig unsichtbar');

@@ -230,7 +230,7 @@ const BuschUI = (() => {
  *  - Regel 4: Farben, Abstände und Schriftgrößen nur über Theme-Variablen.
  */
 
-const CARD_VERSION = "0.5.0";
+const CARD_VERSION = "0.5.1";
 
 const DOCS_URL = "https://github.com/luukkii123/ha-arrstack-cards";
 
@@ -1377,7 +1377,11 @@ class ArrstackDialog extends HTMLElement {
     document.removeEventListener("keydown", this._onKey, true);
     this._background?.forEach(([node, inert]) => { node.inert = inert; });
     if (this._returnFocus?.isConnected) this._returnFocus.focus();
-    else this._returnRoot?.querySelector(this._returnSelector)?.focus();
+    else if (this._returnRoot) {
+      const target = this._returnRoot.querySelector(this._returnSelector) || this._returnRoot.querySelector('ha-card');
+      if (target?.localName === 'ha-card') target.tabIndex = -1;
+      target?.focus();
+    }
     window.removeEventListener("popstate", this._onPop);
   }
 
@@ -1604,10 +1608,11 @@ class ArrstackCardBase extends HTMLElement {
   }
 
   /** Ein WS-Aufruf mit der in der Karte eingestellten Instanz. */
-  _call(type, params = {}) {
+  _call(type, params = {}, route = null) {
     const message = { type, ...params };
-    if (this._config.entry_id) message.entry_id = this._config.entry_id;
-    else if (this._config.service) message.service = this._config.service;
+    const instance = route || this._config;
+    if (instance.entry_id) message.entry_id = instance.entry_id;
+    else if (instance.service) message.service = instance.service;
     return this._hass.callWS(message);
   }
 
@@ -1892,8 +1897,127 @@ class ArrstackCardEditor extends BuschUI.EditorBase {
 
 /* ── Karte 1: laufende Downloads ────────────────────────────────────────── */
 
+/** Gemeinsamer Einzelimport-Controller: Queue und Reparatur verwenden denselben Dialog/API-Vertrag. */
+class ArrstackImportCardBase extends ArrstackCardBase {
+  constructor() {
+    super();
+    this._open = null;
+    this._busy = null;
+    this._message = null;
+    this._itemErrors = new Map();
+    this._operationError = null;
+  }
+
+  _t() {
+    return {...TEXTE_ARRSTACK_FIX_CARD[this._sprache()].texte,...super._t()};
+  }
+
+  _stateLabel(item) {
+    const t=this._t();
+    return {ready:t.eine_datei,no_match:t.keine_datei,selection_required:t.auswahl_noetig,error:t.import_status}[item.import_state] || queueStatusText(item,t);
+  }
+
+  _id(item) { return Number(item.queue_item_id ?? item.id); }
+  _ready(item) {
+    return item.download_complete === true && Number(item.progress) >= 100 &&
+      item.import_state === "ready" && item.candidate_count === 1;
+  }
+  _relevant(item) { return item.download_complete === true && Number(item.progress) >= 100 && item.import_state !== "not_applicable"; }
+
+  async _check(queueItemId) {
+    if (this._busy || this._open?.loading || this._dialog?.isConnected || !queueItemId) return;
+    const route = this._config.entry_id ? {entry_id:this._config.entry_id} : {service:this._config.service || this._data?.service};
+    this._open = {queue_item_id:queueItemId,loading:true,candidate_id:null,route};
+    const t = this._t();
+    const dialog = this._oeffneDialog({
+      titel:t.dialog_pruefen,schliessen:t.schliessen,kompakt:true,
+      dirty:()=>!!this._open?.candidate_id,busy:()=>!!this._busy,
+      koerper:()=>this._dialogKoerper(),aktionen:this._dialogAktionen(),
+      binden:(root,dlg)=>root.querySelectorAll(".candidate-radio").forEach(input=>input.addEventListener("change",()=>{
+        this._open.candidate_id = input.dataset.candidate;
+        dlg.model = {...dlg._model,aktionen:this._dialogAktionen()};
+      })),
+      beiAktion:(id,dlg)=>{ if(id==="import") this._import(queueItemId,this._open?.candidate_id,dlg); else dlg.close(); },
+      beimSchliessen:()=>{this._open=null;}
+    });
+    try {
+      const result = await this._call("arrstack/inspect_import",{queue_item_id:queueItemId},route);
+      if (!dialog.isConnected) return;
+      this._open = {...result,queue_item_id:queueItemId,loading:false,candidate_id:null,route};
+    } catch (error) {
+      if (!dialog.isConnected) return;
+      this._open = {queue_item_id:queueItemId,loading:false,fehler:error,route};
+    }
+    dialog.model = {...dialog._model,aktionen:this._dialogAktionen()};
+  }
+
+  _dialogKoerper() {
+    const info = this._open, t = this._t();
+    if (!info) return "";
+    if (info.loading) return `<div class="dlg-text" role="status">${escapeHtml(t.pruefe)}</div>`;
+
+    const candidates = info.candidates || [];
+    return `${info.fehler ? this._errorMarkup(info.fehler,t.import_fehler,false) : ""}<div class="dlg-text">${escapeHtml(info.parent_title || info.title || "")}</div>
+      <div class="dlg-sub">${escapeHtml(this._stateLabel(info))}</div>
+      ${info.last_error ? this._errorMarkup({message:info.last_error},t.import_status,false) : ""}
+      ${candidates.length ? candidates.map(candidate=>`<div class="candidate">
+        <label class="select-label">
+          <input class="candidate-radio" type="radio" name="candidate" data-candidate="${escapeHtml(candidate.candidate_id)}" ${info.candidate_id===candidate.candidate_id ? "checked" : ""} ${!candidate.valid || this._busy ? "disabled" : ""}>
+          <span class="dlg-text">${escapeHtml(candidate.filename || candidate.name || "")}</span>
+        </label>
+        <div class="dlg-sub">${escapeHtml([formatBytes(candidate.size,t),candidate.quality,...(candidate.languages||[]),candidate.release_group,...(candidate.custom_formats||[])].filter(Boolean).join(" · "))}</div>
+        ${!candidate.valid ? `<div class="dlg-sub">${escapeHtml(t.datei_ungueltig)}</div>` : ""}
+        <details><summary>${escapeHtml(t.details)}</summary><div class="dlg-text">${escapeHtml(candidate.path || "")}</div><div class="dlg-sub">${escapeHtml((candidate.rejections||[]).join(" · "))}</div></details>
+      </div>`).join("") : `<div class="dlg-sub">${escapeHtml(t.keine_datei)}</div>`}`;
+  }
+
+  _dialogAktionen() {
+    const info = this._open || {}, t = this._t();
+    const candidate = (info.candidates || []).find(candidate=>candidate.candidate_id===info.candidate_id && candidate.valid);
+    return [{id:"cancel",text:t.abbrechen,art:"quiet",aus:!!this._busy},
+      {id:"import",text:t.importieren,art:"primary",icon:"check",aus:!!this._busy || (!this._ready(info) && !(this._relevant(info) && candidate))}];
+  }
+
+  async _mutate(type,params={},dialog=null) {
+    if (this._busy) return;
+    this._busy = type; this._message = null; this._operationError = null;
+    this._render();
+    if (dialog) { if (this._open) this._open.fehler=null; dialog.model = {...dialog._model,aktionen:this._dialogAktionen()}; }
+    let closeAfterRefresh = false;
+    try {
+      const result = await this._call(type,params,dialog ? this._open?.route : null);
+      const results = result.results || [result];
+      if (dialog && this._open && result.status === "skipped") {
+        const selected = this._open.candidate_id;
+        this._open = {...this._open,...result,candidate_id:null,fehler:null};
+        if (result.candidates?.some(candidate=>candidate.valid && candidate.candidate_id===selected)) this._open.candidate_id=selected;
+      }
+      const submitted = results.filter(item=>item.status==="submitted").length;
+      const skipped = results.filter(item=>item.status==="skipped").length;
+      const errors = results.filter(item=>item.status==="error" || (item.status==="skipped" && item.last_error));
+      if (dialog && errors.length && this._open) this._open.fehler={message:errors[0].last_error};
+      results.forEach(item=>{if(item.status==="error" || (item.status==="skipped" && item.last_error))this._itemErrors.set(Number(item.queue_item_id),{message:item.last_error});else this._itemErrors.delete(Number(item.queue_item_id));});
+      this._message = fuelle(this._t().uebermittelt,{n:submitted}) + (skipped ? ` ${fuelle(this._t().uebersprungen,{n:skipped})}` : "") + (errors.length ? ` ${fuelle(this._t().teilfehler,{n:errors.length})}` : "");
+      closeAfterRefresh = !!(dialog && !errors.length && submitted);
+    } catch(error) {
+      if (dialog && this._open) this._open.fehler = error;
+      else this._operationError = error;
+    } finally {
+      await this._load();
+      this._busy = null;
+      this._render();
+      if (dialog?.isConnected) {
+        if (closeAfterRefresh) dialog.close(true);
+        else dialog.model = {...dialog._model,aktionen:this._dialogAktionen()};
+      }
+    }
+  }
+  _import(queueItemId,candidateId,dialog) { return this._mutate("arrstack/import_item",{queue_item_id:queueItemId,...(candidateId ? {candidate_id:candidateId} : {})},dialog); }
+
+}
+
 /** Was gerade lädt — Sonarr, Radarr oder SABnzbd, eine Instanz je Karte. */
-class ArrstackDownloadsCard extends ArrstackCardBase {
+class ArrstackDownloadsCard extends ArrstackImportCardBase {
   static get woerterbuch() {
     return TEXTE_ARRSTACK_DOWNLOADS_CARD;
   }
@@ -1933,12 +2057,29 @@ class ArrstackDownloadsCard extends ArrstackCardBase {
 
   _render() {
     if (!this._config) return;
-    this.shadowRoot.innerHTML = `<style>${ARRSTACK_STYLES}</style>
+    const active = this.shadowRoot.activeElement;
+    const focusedItem = active?.classList.contains('act-check') ? active.closest('[data-item]')?.dataset.item : null;
+    this.shadowRoot.innerHTML = `<style>${ARRSTACK_STYLES}
+      .act-check { color: var(--arr-text); background: var(--arr-surface); }
+      </style>
       <ha-card>
         ${this._head("download", this._headMeta())}
+        ${this._message ? `<div class="notice" role="status">${escapeHtml(this._message)}</div>` : ""}
+        ${this._operationError ? this._errorMarkup(this._operationError,this._t().import_fehler,false) : ""}
         ${this._body()}
       </ha-card>`;
     this.shadowRoot.querySelector(".act-retry")?.addEventListener("click",()=>this._load());
+    this.shadowRoot.querySelectorAll(".act-check").forEach(button=>button.addEventListener("click",()=>this._check(Number(button.closest('[data-item]').dataset.item))));
+    if (focusedItem && !this._dialog?.isConnected) requestAnimationFrame(()=>{
+      if (!this.isConnected || this._dialog?.isConnected) return;
+      let current = document.activeElement;
+      while (current?.shadowRoot?.activeElement) current = current.shadowRoot.activeElement;
+      if (current?.isConnected && ![document.body,document.documentElement,this,this.getRootNode().host].includes(current)) return;
+      const button = this.shadowRoot.querySelector(`[data-item="${focusedItem}"] .act-check:not([disabled])`);
+      const target = button || this.shadowRoot.querySelector('ha-card');
+      if (target && !button) target.tabIndex = -1;
+      target?.focus();
+    });
   }
 
   _headMeta() {
@@ -1964,6 +2105,14 @@ class ArrstackDownloadsCard extends ArrstackCardBase {
     return `<div class="rows">${items.map((item) => this._row(item)).join("")}</div>`;
   }
 
+  _canInspect(item) {
+    const service = this._data?.service || this._config?.service;
+    // Nur die Sichtbarkeit der Prüfaktion; fachliche Bereitschaft entscheidet frisch der Server.
+    return ["sonarr","radarr"].includes(service) && Number.isInteger(this._id(item)) && this._id(item)>0 &&
+      String(item.status).toLowerCase()==="completed" && item.sizeleft != null && Number(item.sizeleft)===0 &&
+      Number(item.progress)>=100 && item.is_problem === true;
+  }
+
   _row(item) {
     const t = this._t();
     // SABnzbd liefert `percentage`/`mbleft`, die *arr-Apps `progress`/`sizeleft`.
@@ -1987,12 +2136,13 @@ class ArrstackDownloadsCard extends ArrstackCardBase {
       ? posterMarkup(item.poster, this._data && this._data.brand, "download")
       : "";
     const rest = formatTimeleft(item.timeleft, t) || remaining;
-    return `<div class="row">
+    return `<div class="row" data-item="${this._id(item)}">
       ${poster}
       <div class="row-main">
         <div class="row-title">${escapeHtml(title)}</div>
         <div class="row-meta">${escapeHtml(meta)}</div>
         <div class="bar"><i style="width: ${Math.max(0, Math.min(100, progress))}%"></i></div>
+        ${this._canInspect(item) ? `<div class="actions"><button class="act-check quiet" aria-label="${escapeHtml(`${t.dialog_pruefen}: ${title}`)}" ${this._busy ? "disabled" : ""}>${escapeHtml(t.dialog_pruefen)}</button></div>` : ""}
       </div>
       <div class="row-side">
         <span class="lead">${Math.round(progress)} %</span>
@@ -2093,7 +2243,7 @@ class ArrstackRecentCard extends ArrstackCardBase {
  * sonst überlagern würde, und die Rückfrage vor dem Löschen, weil dabei
  * heruntergeladene Dateien verschwinden.
  */
-class ArrstackFixCard extends ArrstackCardBase {
+class ArrstackFixCard extends ArrstackImportCardBase {
   static get woerterbuch() { return TEXTE_ARRSTACK_FIX_CARD; }
   static getConfigElement() { return document.createElement("arrstack-fix-card-editor"); }
   static getStubConfig() { return { type: "custom:arrstack-fix-card", refresh_seconds: 60, max_items: 5 }; }
@@ -2106,20 +2256,10 @@ class ArrstackFixCard extends ArrstackCardBase {
     return name ? `${name} · ${this._t().kartentitel}` : this._t().kartentitel;
   }
 
-  _stateLabel(item) {
-    const t=this._t();
-    return {ready:t.eine_datei,no_match:t.keine_datei,selection_required:t.auswahl_noetig,error:t.import_status}[item.import_state] || queueStatusText(item,t);
-  }
-
   constructor() {
     super();
-    this._open = null;
-    this._busy = null;
-    this._message = null;
     this._selected = new Set();
     this._lastSelected = null;
-    this._itemErrors = new Map();
-    this._operationError = null;
     this._page = 0;
   }
 
@@ -2134,13 +2274,6 @@ class ArrstackFixCard extends ArrstackCardBase {
     } catch (error) { this._error = error; }
     finally { this._loading = false; this._loaded = true; this._render(); }
   }
-
-  _id(item) { return Number(item.queue_item_id ?? item.id); }
-  _ready(item) {
-    return item.download_complete === true && Number(item.progress) >= 100 &&
-      item.import_state === "ready" && item.candidate_count === 1;
-  }
-  _relevant(item) { return item.download_complete === true && Number(item.progress) >= 100 && item.import_state !== "not_applicable"; }
 
   _render() {
     if (!this._config) return;
@@ -2225,59 +2358,6 @@ class ArrstackFixCard extends ArrstackCardBase {
     });
   }
 
-  async _check(queueItemId) {
-    if (this._busy || !queueItemId) return;
-    this._open = {queue_item_id:queueItemId,loading:true,candidate_id:null};
-    const t = this._t();
-    const dialog = this._oeffneDialog({
-      titel:t.dialog_pruefen,schliessen:t.schliessen,kompakt:true,
-      dirty:()=>!!this._open?.candidate_id,busy:()=>!!this._busy,
-      koerper:()=>this._dialogKoerper(),aktionen:this._dialogAktionen(),
-      binden:(root,dlg)=>root.querySelectorAll(".candidate-radio").forEach(input=>input.addEventListener("change",()=>{
-        this._open.candidate_id = input.dataset.candidate;
-        dlg.model = {...dlg._model,aktionen:this._dialogAktionen()};
-      })),
-      beiAktion:(id,dlg)=>{ if(id==="import") this._import(queueItemId,this._open?.candidate_id,dlg); else dlg.close(); },
-      beimSchliessen:()=>{this._open=null;}
-    });
-    try {
-      const result = await this._call("arrstack/inspect_import",{queue_item_id:queueItemId});
-      if (!dialog.isConnected) return;
-      this._open = {...result,queue_item_id:queueItemId,loading:false,candidate_id:null};
-    } catch (error) {
-      if (!dialog.isConnected) return;
-      this._open = {queue_item_id:queueItemId,loading:false,fehler:error};
-    }
-    dialog.model = {...dialog._model,aktionen:this._dialogAktionen()};
-  }
-
-  _dialogKoerper() {
-    const info = this._open, t = this._t();
-    if (!info) return "";
-    if (info.loading) return `<div class="dlg-text" role="status">${escapeHtml(t.pruefe)}</div>`;
-
-    const candidates = info.candidates || [];
-    return `${info.fehler ? this._errorMarkup(info.fehler,t.import_fehler,false) : ""}<div class="dlg-text">${escapeHtml(info.parent_title || info.title || "")}</div>
-      <div class="dlg-sub">${escapeHtml(this._stateLabel(info))}</div>
-      ${info.last_error ? this._errorMarkup({message:info.last_error},t.import_status,false) : ""}
-      ${candidates.length ? candidates.map(candidate=>`<div class="candidate">
-        <label class="select-label">
-          <input class="candidate-radio" type="radio" name="candidate" data-candidate="${escapeHtml(candidate.candidate_id)}" ${info.candidate_id===candidate.candidate_id ? "checked" : ""} ${!candidate.valid || this._busy ? "disabled" : ""}>
-          <span class="dlg-text">${escapeHtml(candidate.filename || candidate.name || "")}</span>
-        </label>
-        <div class="dlg-sub">${escapeHtml([formatBytes(candidate.size,t),candidate.quality,...(candidate.languages||[]),candidate.release_group,...(candidate.custom_formats||[])].filter(Boolean).join(" · "))}</div>
-        ${!candidate.valid ? `<div class="dlg-sub">${escapeHtml(t.datei_ungueltig)}</div>` : ""}
-        <details><summary>${escapeHtml(t.details)}</summary><div class="dlg-text">${escapeHtml(candidate.path || "")}</div><div class="dlg-sub">${escapeHtml((candidate.rejections||[]).join(" · "))}</div></details>
-      </div>`).join("") : `<div class="dlg-sub">${escapeHtml(t.keine_datei)}</div>`}`;
-  }
-
-  _dialogAktionen() {
-    const info = this._open || {}, t = this._t();
-    const candidate = (info.candidates || []).find(candidate=>candidate.candidate_id===info.candidate_id && candidate.valid);
-    return [{id:"cancel",text:t.abbrechen,art:"quiet",aus:!!this._busy},
-      {id:"import",text:t.importieren,art:"primary",icon:"check",aus:!!this._busy || (!this._ready(info) && !(this._relevant(info) && candidate))}];
-  }
-
   _fragLoeschen(itemId,titel) {
     if (!itemId || this._busy) return;
     const t = this._t();
@@ -2287,36 +2367,6 @@ class ArrstackFixCard extends ArrstackCardBase {
       beiAktion:(id,dlg)=>{dlg.close();if(id==="delete")this._delete(itemId);}});
   }
 
-  async _mutate(type,params={},dialog=null) {
-    if (this._busy) return;
-    this._busy = type; this._message = null; this._operationError = null;
-    this._render();
-    if (dialog) { if (this._open) this._open.fehler=null; dialog.model = {...dialog._model,aktionen:this._dialogAktionen()}; }
-    try {
-      const result = await this._call(type,params);
-      const results = result.results || [result];
-      if (dialog && this._open && result.status === "skipped") {
-        const selected = this._open.candidate_id;
-        this._open = {...this._open,...result,candidate_id:null,fehler:null};
-        if (result.candidates?.some(candidate=>candidate.valid && candidate.candidate_id===selected)) this._open.candidate_id=selected;
-      }
-      const submitted = results.filter(item=>item.status==="submitted").length;
-      const skipped = results.filter(item=>item.status==="skipped").length;
-      const errors = results.filter(item=>item.status==="error" || (item.status==="skipped" && item.last_error));
-      if (dialog && errors.length && this._open) this._open.fehler={message:errors[0].last_error};
-      results.forEach(item=>{if(item.status==="error" || (item.status==="skipped" && item.last_error))this._itemErrors.set(Number(item.queue_item_id),{message:item.last_error});else this._itemErrors.delete(Number(item.queue_item_id));});
-      this._message = fuelle(this._t().uebermittelt,{n:submitted}) + (skipped ? ` ${fuelle(this._t().uebersprungen,{n:skipped})}` : "") + (errors.length ? ` ${fuelle(this._t().teilfehler,{n:errors.length})}` : "");
-      if (dialog && !errors.length && submitted) dialog.close(true);
-    } catch(error) {
-      if (dialog && this._open) this._open.fehler = error;
-      else this._operationError = error;
-    } finally {
-      this._busy = null;
-      if (dialog?.isConnected) dialog.model = {...dialog._model,aktionen:this._dialogAktionen()};
-      await this._load();
-    }
-  }
-  _import(queueItemId,candidateId,dialog) { return this._mutate("arrstack/import_item",{queue_item_id:queueItemId,...(candidateId ? {candidate_id:candidateId} : {})},dialog); }
   _importReady() { return this._mutate("arrstack/import_ready"); }
   _importSelected() {
     const ids=(this._data?.items || []).filter(item=>this._ready(item) && this._selected.has(this._id(item))).map(item=>this._id(item));
