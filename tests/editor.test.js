@@ -47,6 +47,32 @@ const context = {
 vm.runInNewContext(fs.readFileSync(path.join(__dirname, "../dist/arrstack-cards.js"), "utf8"), context);
 
 async function run() {
+  const columnEditor = new (elements.get('arrstack-downloads-card-editor'))();
+  const initialColumns=Object.freeze(['title','status','title','unknown']);
+  columnEditor.setConfig(Object.freeze({type:'custom:arrstack-downloads-card',columns:initialColumns,show_posters:true}));
+  columnEditor.hass={locale:{language:'de'},callWS:async()=>({instances:[]})};
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.deepEqual(Array.from(columnEditor._config.columns),['title','status'],'Editor normalisiert ohne fremde Eingabe zu mutieren');
+  assert.deepEqual(Array.from(initialColumns),['title','status','title','unknown']);
+  const legacyEditor=new (elements.get('arrstack-downloads-card-editor'))();
+  legacyEditor.setConfig({type:'custom:arrstack-downloads-card',show_posters:false});
+  assert.equal(legacyEditor._config.show_posters,false,'bestehende explizite Posteroption erhalten');
+  assert.equal(legacyEditor._config.show_unknown,true,'unbekannte Titel bleiben sichtbar');
+  assert.deepEqual(Array.from(legacyEditor._config.columns),['title','status','episode','timeleft','progress'],'legacy Config bekommt konsistente sichtbare Defaults');
+  const selectedField=columnEditor.children[0].schema.find(field=>field.name==='columns');
+  assert(selectedField.selector.select.multiple,'sichtbare Spalten sind ha-form Mehrfachauswahl');
+  const columnChanges=[];
+  columnEditor.addEventListener('config-changed',event=>columnChanges.push(JSON.parse(JSON.stringify(event.detail.config))));
+  columnEditor._moveColumn('status',-1);
+  assert.deepEqual(Array.from(columnEditor._config.columns),['status','title'],'native Hochaktion ändert Reihenfolge');
+  const orderWrites=columnEditor.children[0].dataWrites;
+  columnEditor.setConfig(columnChanges[0]);
+  assert.equal(columnEditor.children[0].dataWrites,orderWrites,'Reihenfolgen-Echo setzt Formular nicht zurück');
+  columnEditor._moveColumn('status',-1);
+  assert.equal(columnChanges.length,1,'Grenze führt keine leere Änderung aus');
+  columnEditor.children[0].dispatchEvent({type:'value-changed',detail:{value:{columns:['status','episode']}},stopPropagation(){}});
+  assert.deepEqual(Array.from(columnEditor._config.columns),['status','episode'],'sichtbare Spalten aktualisieren Reihenfolge');
+
   for (const tag of [
     "arrstack-downloads-card-editor",
     "arrstack-recent-card-editor",
@@ -60,6 +86,7 @@ async function run() {
     const original = Object.freeze({
       type: `custom:${tag.slice(0, -7)}`, title: "Start", refresh_seconds: 15,
       tap_action: tapAction,
+      ...(tag.includes("downloads") ? {columns:["title","status","episode","timeleft","progress"],show_posters:true,show_unknown:true,max_items:10} : {}),
     });
     const emitted = [];
     editor.addEventListener("config-changed", (event) => {
@@ -88,7 +115,7 @@ async function run() {
     editor.setConfig(JSON.parse(JSON.stringify(original)));
     editor.hass = { ...editor._hass, locale: { language: "en" } };
     assert.equal(form.dataWrites, writes, `${tag}: gleiche Config und hass dürfen Eingabe nicht zurücksetzen`);
-    assert.equal(form.schemaWrites, schemaWrites, `${tag}: hass darf das Schema nicht neu aufbauen`);
+    assert.equal(form.schemaWrites, schemaWrites + (tag.includes("downloads") ? 1 : 0), `${tag}: nur neue Spaltenlabels brauchen Schema bei Sprachwechsel`);
     assert.notEqual(form.computeLabel(form.schema[0]), "Überschrift");
 
     form.dispatchEvent({ type: "value-changed", detail: { value: { title: "Neu" } }, stopPropagation() {} });

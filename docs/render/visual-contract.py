@@ -42,7 +42,7 @@ try:
         browser = playwright.chromium.launch(args=["--no-sandbox"])
         page = browser.new_page(viewport={"width": 320, "height": 1200}, device_scale_factor=1, locale="de-DE")
         page.goto(f"http://127.0.0.1:{server.server_port}/page.html", wait_until="load")
-        page.wait_for_function("window.__cards?.downloads?.shadowRoot?.querySelector('.rows')")
+        page.wait_for_function("window.__cards?.downloads?.shadowRoot?.querySelector('.queue-table')")
         page.evaluate("""async () => {
           await window.__cards.seer._search('beispiel');
           const fix = window.__cards.fix;
@@ -258,7 +258,7 @@ try:
                 if (metrics["pageWidth"] > width or not metrics["within"] or metrics["collides"]
                         or metrics["textOverflow"] or not metrics["helpers"]
                         or metrics["minimumHeight"] < 44 or metrics["outline"] == "none"
-                        or metrics["fields"] != 21 or min(metrics["options"]) < 2):
+                        or metrics["fields"] != 23 or min(metrics["options"]) < 2):
                     findings.append(f"Editoren {width}/{theme}: {metrics}")
         browser.close()
 finally:

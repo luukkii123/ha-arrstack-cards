@@ -334,3 +334,42 @@ synthetische Queueprüfung sind im [Abnahmebericht](docs/abnahme-2026-10-08-queu
 mit der 26-Regel-Matrix dokumentiert. Keine produktive Medienaktion wurde
 für diese Prüfung ausgeführt. Veröffentlichung und Installation folgen
 separat über die Koordination.
+
+### Geprüfter lokaler Kandidat — 08.10.2026 · 0.6.0
+
+Die Warteschlange behält ihre Poster und zeigt auf breiten Karten eine
+Tabelle mit breiter Titelspalte. Auf schmalen Karten stehen Titel und
+Prüficon in einer gemeinsamen Zeile, darunter Status, Episode, Restzeit und
+Fortschrittsbalken. **Dateien prüfen** öffnet weiterhin den gemeinsamen
+Importdialog. Konkrete Importfehler erscheinen direkt am Eintrag;
+zusätzliche Hinweise des Downloaddienstes lassen sich aufklappen.
+
+Im Karteneditor lassen sich sichtbare Spalten wählen und mit **Hoch/Runter**
+per Tastatur oder Touch sortieren. Die Seitengröße reicht bis 200; weitere
+Einträge sind über den Seitenwechsel erreichbar. Bestehende Überschriften,
+Instanzen und explizite Posteroptionen bleiben erhalten. Nicht zugeordnete
+Titel bleiben standardmäßig sichtbar.
+
+```yaml
+type: custom:arrstack-downloads-card
+show_posters: true
+show_unknown: true
+max_items: 10
+columns:
+  - title
+  - status
+  - episode
+  - timeleft
+  - progress
+```
+
+Optional sind `episode_title`, `episode_air_date`, `languages`, `quality`,
+`custom_formats`, `custom_format_score`, `protocol`, `indexer`,
+`download_client`, `release_title`, `size` und `output_path`. Die zusätzlichen
+Metadaten benötigen Arrstack Integration 0.4.1. Fehlende Angaben werden als
+„—“ angezeigt. Viele ausgewählte Spalten erscheinen als lesbare Details
+statt als gequetschte Tabelle.
+
+Lokale Tests und die tatsächlichen Grenzen stehen im
+[Abnahmebericht](docs/abnahme-2026-10-08-queue-table.md). Dieser Abschnitt
+belegt den Kandidaten; Veröffentlichung und Installation folgen separat.

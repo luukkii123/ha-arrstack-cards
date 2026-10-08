@@ -230,7 +230,7 @@ const BuschUI = (() => {
  *  - Regel 4: Farben, Abstände und Schriftgrößen nur über Theme-Variablen.
  */
 
-const CARD_VERSION = "0.5.1";
+const CARD_VERSION = "0.6.0";
 
 const DOCS_URL = "https://github.com/luukkii123/ha-arrstack-cards";
 
@@ -477,13 +477,33 @@ const TEXTE_ARRSTACK_BASIS = {
 
 /* ── Karte 1: laufende Downloads ────────────────────────────────────────── */
 
+const ARRSTACK_QUEUE_COLUMNS = {
+  title: ['Serie / Film', 'Series / movie'], status: ['Status', 'Status'],
+  episode: ['Episode', 'Episode'], timeleft: ['Restzeit', 'Time left'],
+  progress: ['Fortschritt', 'Progress'], episode_title: ['Episodentitel', 'Episode title'],
+  episode_air_date: ['Ausstrahlung', 'Air date'], languages: ['Sprachen', 'Languages'],
+  quality: ['Qualität', 'Quality'], custom_formats: ['Custom Formats', 'Custom formats'],
+  custom_format_score: ['Formatwertung', 'Format score'], protocol: ['Protokoll', 'Protocol'],
+  indexer: ['Indexer', 'Indexer'], download_client: ['Downloadclient', 'Download client'],
+  release_title: ['Release-Titel', 'Release title'], size: ['Größe', 'Size'],
+  output_path: ['Ausgabepfad', 'Output path'],
+};
+const ARRSTACK_QUEUE_DEFAULT_COLUMNS = ['title','status','episode','timeleft','progress'];
+function queueColumns(value) {
+  const valid = Array.isArray(value) ? [...new Set(value.filter(key=>Object.hasOwn(ARRSTACK_QUEUE_COLUMNS,key)))] : [];
+  return valid.length ? valid : [...ARRSTACK_QUEUE_DEFAULT_COLUMNS];
+}
+function queueColumnLabel(key,language) { return ARRSTACK_QUEUE_COLUMNS[key]?.[language==='de' ? 0 : 1] || key; }
+
 const SCHEMA_ARRSTACK_DOWNLOADS_CARD = [
   { name: "title", selector: { text: {} } },
   { name: "entry_id", selector: { select: { options: [], mode: "dropdown", custom_value: false } } },
   { name: "service", selector: { select: { options: [], mode: "dropdown", custom_value: false } } },
   { name: "refresh_seconds", selector: { number: { min: 0, max: 600, mode: "box", unit_of_measurement: "s" } } },
-  { name: "max_items", selector: { number: { min: 1, max: 50, mode: "box" } } },
+  { name: "max_items", selector: { number: { min: 1, max: 200, mode: "box" } } },
   { name: "show_posters", selector: { boolean: {} } },
+  { name: "show_unknown", selector: { boolean: {} } },
+  { name: "columns", selector: { select: { options: [], multiple: true, mode: "dropdown", custom_value: false } } },
 ];
 
 const TEXTE_ARRSTACK_DOWNLOADS_CARD = {
@@ -495,20 +515,26 @@ const TEXTE_ARRSTACK_DOWNLOADS_CARD = {
       entry_id: "Instanz",
       service: "Dienst",
       refresh_seconds: "Neu laden alle",
-      max_items: "Einträge",
+      max_items: "Einträge pro Seite",
       show_posters: "Poster zeigen",
+      show_unknown: "Unbekannte Titel zeigen",
+      columns: "Sichtbare Spalten",
     },
     helpers: {
       title: "Überschrift der Karte. Vorgabe: Downloads.",
       entry_id: "Welche eingerichtete arrstack-Instanz die Karte abfragt. Vorgabe: die einzige passende.",
       service: "Diensttyp, wenn keine Instanz gewählt ist. Vorgabe: die Integration entscheidet.",
       refresh_seconds: "Sekunden zwischen zwei Abfragen. 0 schaltet das Nachladen ab. Vorgabe 15.",
-      max_items: "Wie viele Zeilen die Karte höchstens zeigt. Vorgabe 10.",
+      max_items: "Wie viele Zeilen eine Seite zeigt. Vorgabe 10; weitere Einträge sind über den Seitenwechsel erreichbar.",
       show_posters: "Zeigt links neben jeder Zeile das Poster. Vorgabe an.",
+      show_unknown: "Zeigt auch nicht zugeordnete Filme oder Serien. Vorgabe an, damit Importprobleme sichtbar bleiben.",
+      columns: "Welche Informationen die Warteschlange zeigt. Die Reihenfolge lässt sich darunter mit Hoch und Runter ändern.",
     },
     texte: {
       ...TEXTE_ARRSTACK_BASIS.de,
       kartentitel: "Downloads",
+      spaltenreihenfolge: "Spaltenreihenfolge", hoch: "Hoch", runter: "Runter",
+      nach_oben: "nach oben", nach_unten: "nach unten", poster: "Poster", aktionen: "Aktionen", import_hinweise: "Importhinweise",
       leer: "Nichts in der Warteschlange.",
     },
   },
@@ -520,20 +546,26 @@ const TEXTE_ARRSTACK_DOWNLOADS_CARD = {
       entry_id: "Instance",
       service: "Service",
       refresh_seconds: "Reload every",
-      max_items: "Entries",
+      max_items: "Items per page",
       show_posters: "Show posters",
+      show_unknown: "Show unknown titles",
+      columns: "Visible columns",
     },
     helpers: {
       title: "Heading of the card. Default: Downloads.",
       entry_id: "Which configured arrstack instance the card queries. Default: the only matching one.",
       service: "Service type when no instance is picked. Default: the integration decides.",
       refresh_seconds: "Seconds between two queries. 0 turns reloading off. Default 15.",
-      max_items: "How many rows the card shows at most. Default 10.",
+      max_items: "How many rows a page shows. Default 10; further items are available using page navigation.",
       show_posters: "Shows the poster left of every row. Default on.",
+      show_unknown: "Includes movies or shows that could not be matched. Default on so import problems stay visible.",
+      columns: "Which queue information is shown. Change its order below with Up and Down.",
     },
     texte: {
       ...TEXTE_ARRSTACK_BASIS.en,
       kartentitel: "Downloads",
+      spaltenreihenfolge: "Column order", hoch: "Up", runter: "Down",
+      nach_oben: "up", nach_unten: "down", poster: "Poster", aktionen: "Actions", import_hinweise: "Import notes",
       leer: "Nothing in the queue.",
     },
   },
@@ -1807,7 +1839,7 @@ class ArrstackCardEditor extends BuschUI.EditorBase {
   }
 
   setConfig(config) {
-    const next = BuschUI.validateConfig(config || {}).value;
+    const next = this._normalizeConfig(BuschUI.validateConfig(config || {}).value);
     if (!BuschUI.acceptEcho(this._echoState,next,this._config)) return;
     this._config = next;
     this._render();
@@ -1836,6 +1868,9 @@ class ArrstackCardEditor extends BuschUI.EditorBase {
     }
     this._render();
   }
+
+  _normalizeConfig(config) { return config; }
+  _afterFormChange() {}
 
   /** Das feste Schema der Karte, nur die Auswahllisten werden gefüllt. */
   _schema() {
@@ -1873,12 +1908,13 @@ class ArrstackCardEditor extends BuschUI.EditorBase {
       };
       this._form.addEventListener("value-changed", (event) => {
         event.stopPropagation();
-        this._config = { ...this._config, ...cloneEditorValue(event.detail.value || {}) };
+        this._config = this._normalizeConfig({ ...this._config, ...cloneEditorValue(event.detail.value || {}) });
         BuschUI.queueEcho(this._echoState,this._config);
         // ha-form besitzt den gerade editierten Zustand bereits. Kein
         // data-Reset während einer Tastatureingabe oder beim HA-Echo.
         this._renderedConfig = this._config;
         BuschUI.emitConfigChanged(this,this._config,{echo:false});
+        this._afterFormChange();
       });
       const style=document.createElement('style');style.textContent=BuschUI.editorStyles;this.classList?.add('busch-ui-editor');
       this.appendChild(this._form);this.appendChild(style);
@@ -1897,6 +1933,48 @@ class ArrstackCardEditor extends BuschUI.EditorBase {
 
 /* ── Karte 1: laufende Downloads ────────────────────────────────────────── */
 
+class ArrstackDownloadsEditor extends ArrstackCardEditor {
+  constructor() {super();this._services=['sonarr','radarr','sabnzbd'];this._basisSchema=SCHEMA_ARRSTACK_DOWNLOADS_CARD;this._woerterbuch=TEXTE_ARRSTACK_DOWNLOADS_CARD;}
+  _normalizeConfig(config) { return {show_posters:true,show_unknown:true,max_items:10,...config,columns:queueColumns(config.columns)}; }
+  _schema() {
+    return super._schema().map(field=>field.name==='columns' ? {...field,selector:{select:{multiple:true,custom_value:false,mode:'dropdown',options:Object.keys(ARRSTACK_QUEUE_COLUMNS).map(key=>({value:key,label:queueColumnLabel(key,this._sprache())}))}}} : field);
+  }
+  _render() {
+    super._render();
+    const language=this._sprache();
+    if(this._form && this._renderedLanguage && this._renderedLanguage!==language) this._form.schema=this._schema();
+    this._renderedLanguage=language;this._renderOrder();
+  }
+  _afterFormChange() { this._renderOrder(); }
+  _moveColumn(key,direction) {
+    const columns=queueColumns(this._config.columns),index=columns.indexOf(key),next=index+direction;
+    if (index<0 || next<0 || next>=columns.length) return;
+    [columns[index],columns[next]]=[columns[next],columns[index]];
+    this._config={...this._config,columns}; BuschUI.queueEcho(this._echoState,this._config);
+    this._form.data=cloneEditorValue(this._config); this._renderedConfig=this._config;
+    BuschUI.emitConfigChanged(this,this._config,{echo:false});this._renderOrder();
+    const controls=this._order?.querySelectorAll?.('button') || [];
+    const target=Array.from(controls).find(button=>button.dataset.column===key && Number(button.dataset.move)===direction && !button.disabled) || Array.from(controls).find(button=>button.dataset.column===key && !button.disabled);
+    target?.focus();
+  }
+  _renderOrder() {
+    if (!this._form || !this._config) return;
+    if (!this._order) {this._order=document.createElement('details');this._order.className='queue-column-order';this.appendChild(this._order);}
+    const renderKey=JSON.stringify([queueColumns(this._config.columns),this._sprache()]);
+    if(this._orderKey===renderKey) return;
+    this._orderKey=renderKey;
+    let active=document.activeElement;
+    while(active?.shadowRoot?.activeElement) active=active.shadowRoot.activeElement;
+    const focus=this._order.querySelectorAll?.('button') ? Array.from(this._order.querySelectorAll('button')).find(button=>button===active) : null;
+    const key=focus?.dataset.column,move=focus?.dataset.move;
+    const columns=queueColumns(this._config.columns),t=this._woerterbuch[this._sprache()].texte;
+    this._order.innerHTML=`<summary>${escapeHtml(t.spaltenreihenfolge)}</summary><div role="status" aria-live="polite" class="queue-order-status">${columns.map(key=>queueColumnLabel(key,this._sprache())).join(' · ')}</div>${columns.map((key,index)=>`<div class="queue-order-row"><span>${escapeHtml(queueColumnLabel(key,this._sprache()))}</span><button type="button" data-column="${key}" data-move="-1" aria-label="${escapeHtml(`${queueColumnLabel(key,this._sprache())} ${t.nach_oben}`)}" ${index===0 ? 'disabled' : ''}>${escapeHtml(t.hoch)}</button><button type="button" data-column="${key}" data-move="1" aria-label="${escapeHtml(`${queueColumnLabel(key,this._sprache())} ${t.nach_unten}`)}" ${index===columns.length-1 ? 'disabled' : ''}>${escapeHtml(t.runter)}</button></div>`).join('')}`;
+    this._order.querySelectorAll?.('button').forEach(button=>button.addEventListener('click',()=>this._moveColumn(button.dataset.column,Number(button.dataset.move))));
+    if (key) Array.from(this._order.querySelectorAll('button')).find(button=>button.dataset.column===key && button.dataset.move===move)?.focus();
+    if (!this._orderStyle) {this._orderStyle=document.createElement('style');this._orderStyle.textContent=`.queue-column-order{margin-top:var(--ha-space-4,24px);color:var(--primary-text-color)}.queue-column-order summary{cursor:pointer;min-height:44px;display:flex;align-items:center}.queue-order-status{font-size:var(--ha-font-size-s,0.8125rem);overflow-wrap:anywhere;margin-bottom:var(--ha-space-2,8px)}.queue-order-row{display:flex;align-items:center;gap:var(--ha-space-2,8px)}.queue-order-row span{flex:1;min-width:0;overflow-wrap:anywhere}.queue-order-row button{font:inherit;min-height:44px;min-width:44px;padding:var(--ha-space-2,8px);border:0;border-radius:var(--ha-card-border-radius,12px);background:none;color:var(--primary-text-color);cursor:pointer}.queue-order-row button:disabled{color:var(--secondary-text-color);cursor:default}.queue-order-row button:focus-visible{outline:2px solid var(--primary-color)}`;this.appendChild(this._orderStyle);}
+  }
+}
+
 /** Gemeinsamer Einzelimport-Controller: Queue und Reparatur verwenden denselben Dialog/API-Vertrag. */
 class ArrstackImportCardBase extends ArrstackCardBase {
   constructor() {
@@ -1910,6 +1988,11 @@ class ArrstackImportCardBase extends ArrstackCardBase {
 
   _t() {
     return {...TEXTE_ARRSTACK_FIX_CARD[this._sprache()].texte,...super._t()};
+  }
+
+  _importErrorMarkup(error,heading) {
+    const details=error?.details;
+    return `<div class="notice problem" role="alert"><div>${escapeHtml(heading || this._t().import_fehler)}</div><div>${escapeHtml(error?.message || this._t().fehler_kurz)}</div>${details ? `<details><summary>${escapeHtml(this._t().details)}</summary><pre>${escapeHtml(typeof details==='string' ? details : JSON.stringify(details,null,2))}</pre></details>` : ''}</div>`;
   }
 
   _stateLabel(item) {
@@ -1957,9 +2040,9 @@ class ArrstackImportCardBase extends ArrstackCardBase {
     if (info.loading) return `<div class="dlg-text" role="status">${escapeHtml(t.pruefe)}</div>`;
 
     const candidates = info.candidates || [];
-    return `${info.fehler ? this._errorMarkup(info.fehler,t.import_fehler,false) : ""}<div class="dlg-text">${escapeHtml(info.parent_title || info.title || "")}</div>
+    return `${info.fehler ? (info.fehler.fachlich ? this._importErrorMarkup(info.fehler,t.import_fehler) : this._errorMarkup(info.fehler,t.import_fehler,false)) : ""}<div class="dlg-text">${escapeHtml(info.parent_title || info.title || "")}</div>
       <div class="dlg-sub">${escapeHtml(this._stateLabel(info))}</div>
-      ${info.last_error ? this._errorMarkup({message:info.last_error},t.import_status,false) : ""}
+      ${info.last_error && info.last_error!==info.fehler?.message ? this._importErrorMarkup({message:info.last_error,details:info.last_error_details},t.import_status) : ""}
       ${candidates.length ? candidates.map(candidate=>`<div class="candidate">
         <label class="select-label">
           <input class="candidate-radio" type="radio" name="candidate" data-candidate="${escapeHtml(candidate.candidate_id)}" ${info.candidate_id===candidate.candidate_id ? "checked" : ""} ${!candidate.valid || this._busy ? "disabled" : ""}>
@@ -1993,11 +2076,11 @@ class ArrstackImportCardBase extends ArrstackCardBase {
         if (result.candidates?.some(candidate=>candidate.valid && candidate.candidate_id===selected)) this._open.candidate_id=selected;
       }
       const submitted = results.filter(item=>item.status==="submitted").length;
-      const skipped = results.filter(item=>item.status==="skipped").length;
+      const skipped = results.filter(item=>item.status==="skipped" && !item.last_error).length;
       const errors = results.filter(item=>item.status==="error" || (item.status==="skipped" && item.last_error));
-      if (dialog && errors.length && this._open) this._open.fehler={message:errors[0].last_error};
-      results.forEach(item=>{if(item.status==="error" || (item.status==="skipped" && item.last_error))this._itemErrors.set(Number(item.queue_item_id),{message:item.last_error});else this._itemErrors.delete(Number(item.queue_item_id));});
-      this._message = fuelle(this._t().uebermittelt,{n:submitted}) + (skipped ? ` ${fuelle(this._t().uebersprungen,{n:skipped})}` : "") + (errors.length ? ` ${fuelle(this._t().teilfehler,{n:errors.length})}` : "");
+      if (dialog && errors.length && this._open) this._open.fehler={message:errors[0].last_error,details:errors[0].last_error_details,fachlich:true};
+      results.forEach(item=>{if(item.status==="error" || (item.status==="skipped" && item.last_error))this._itemErrors.set(Number(item.queue_item_id),{message:item.last_error,details:item.last_error_details});else this._itemErrors.delete(Number(item.queue_item_id));});
+      this._message = [submitted ? fuelle(this._t().uebermittelt,{n:submitted}) : "",skipped ? fuelle(this._t().uebersprungen,{n:skipped}) : "",errors.length ? fuelle(this._t().teilfehler,{n:errors.length}) : ""].filter(Boolean).join(" ");
       closeAfterRefresh = !!(dialog && !errors.length && submitted);
     } catch(error) {
       if (dialog && this._open) this._open.fehler = error;
@@ -2016,6 +2099,67 @@ class ArrstackImportCardBase extends ArrstackCardBase {
 
 }
 
+const ARRSTACK_DOWNLOADS_STYLES = `
+  .queue-table { --queue-columns:minmax(0,1fr); --queue-poster: var(--arr-poster-w); --queue-action: 44px; }
+  .queue-grid { display:grid; grid-template-columns:var(--queue-columns); align-items:center; gap:var(--arr-space-3); min-width:0; }
+  .queue-header { color:var(--arr-muted); font-size:var(--arr-font-sm); padding-bottom:var(--arr-space-2); border-bottom:1px solid var(--arr-line); }
+  .queue-row { padding-block:var(--arr-space-3); }
+  .queue-row + .queue-row { border-top:1px solid var(--arr-line); }
+  .queue-fields { display:contents; }
+  .queue-cell { min-width:0; font-size:var(--arr-font-sm); }
+  .queue-value { display:block; min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+  .queue-label { display:none; color:var(--arr-muted); }
+  .queue-cell[data-column=title] .queue-value { font-size:var(--arr-font-md); color:var(--arr-text); }
+  .queue-progress { font-variant-numeric:tabular-nums; }
+  .queue-progress .bar { width:100%; }
+  .queue-action { align-self:start; }
+  .queue-action button { width:var(--queue-action); min-width:var(--queue-action); height:var(--queue-action); padding:0; justify-content:center; color:var(--arr-text); }
+  .queue-action button:hover { color:var(--arr-accent); }
+  .queue-action button[disabled] { color:var(--arr-muted); }
+  .queue-reasons { grid-column:1 / -1; margin:0; }
+  .queue-reasons .notice { padding:0; background:none; }
+  .queue-reasons .notice + .notice { margin-top:var(--arr-space-2); }
+  .queue-reasons p { margin:0; overflow-wrap:anywhere; color:var(--arr-muted); font-size:var(--arr-font-sm); }
+  .queue-message summary { min-height:44px;display:flex;align-items:center;gap:var(--arr-space-2);cursor:pointer;color:var(--arr-muted);font-size:var(--arr-font-sm); }
+  .queue-message summary:focus-visible { outline:2px solid var(--arr-accent);outline-offset:2px; }
+  .queue-message[open] summary { color:var(--arr-text); }
+  .queue-pages { display:flex; align-items:center; justify-content:space-between; gap:var(--arr-space-2); margin-top:var(--arr-space-3); }
+  .queue-page-label { font-size:var(--arr-font-sm); color:var(--arr-muted); min-width:0; text-align:center; }
+  .queue-table.expanded .queue-header { display:none; }
+  .queue-table.expanded .queue-row { grid-template-columns:var(--queue-poster) minmax(0,1fr) var(--queue-action); align-items:start; }
+  .queue-table.expanded .queue-cell { grid-column:2 / -1; display:grid; grid-template-columns:minmax(0,1fr) minmax(0,2fr); gap:var(--arr-space-2); }
+  .queue-table.expanded .queue-label { display:block; }
+  .queue-table.expanded .queue-cell[data-column=title] { grid-column:2; display:block; }
+  .queue-table.expanded .queue-cell[data-column=title] .queue-label { display:none; }
+  .queue-table.expanded .queue-poster { grid-column:1; grid-row:1 / span 2; }
+  .queue-table.expanded .queue-action { grid-column:3; grid-row:1; }
+  .queue-table.expanded .queue-value { white-space:normal; overflow-wrap:anywhere; }
+  .queue-table.expanded .queue-cell[data-column=title] .queue-value { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
+  @container (max-width: 620px) {
+    .queue-header { display:none; }
+    .queue-row { grid-template-columns:var(--queue-poster) minmax(0,1fr) var(--queue-action); align-items:start; }
+    .queue-cell { grid-column:2 / -1; display:grid; grid-template-columns:minmax(0,1fr) minmax(0,2fr); gap:var(--arr-space-2); }
+    .queue-label { display:block; }
+    .queue-cell[data-column=title] { grid-column:2; display:block; }
+    .queue-cell[data-column=title] .queue-label { display:none; }
+    .queue-poster { grid-column:1; grid-row:1 / span 2; }
+    .queue-action { grid-column:3; grid-row:1; }
+    .queue-value { white-space:normal; overflow-wrap:anywhere; }
+    .queue-cell[data-column=title] .queue-value { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
+    .queue-reasons { grid-column:2 / -1; }
+    .queue-table:not(.expanded) .queue-fields { display:flex;flex-wrap:wrap;align-items:center;gap:var(--arr-space-2);grid-column:2 / -1;grid-row:1;min-width:0; }
+    .queue-table:not(.expanded) .queue-cell { display:flex;align-items:center;gap:var(--arr-space-1);flex:0 1 auto;max-width:100%; }
+    .queue-table:not(.expanded) .queue-cell[data-column=title] { flex:1 1 100%;min-height:var(--queue-action);padding-inline-end:calc(var(--queue-action) + var(--arr-space-2));box-sizing:border-box; }
+    .queue-table:not(.expanded) .queue-cell[data-column=progress] { flex:1 1 100%; }
+    .queue-table:not(.expanded) .queue-cell[data-column=status] .queue-label,
+    .queue-table:not(.expanded) .queue-cell[data-column=progress] .queue-label { display:none; }
+    .queue-table:not(.expanded) .queue-cell .queue-value { white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0; }
+    .queue-table:not(.expanded) .queue-progress { display:flex;align-items:center;gap:var(--arr-space-2);width:100%; }
+    .queue-table:not(.expanded) .queue-progress .bar { flex:1;min-width:0;margin-top:0; }
+    .queue-table:not(.expanded) .status-badge { padding:0;background:none;white-space:normal;overflow-wrap:anywhere; }
+  }
+`;
+
 /** Was gerade lädt — Sonarr, Radarr oder SABnzbd, eine Instanz je Karte. */
 class ArrstackDownloadsCard extends ArrstackImportCardBase {
   static get woerterbuch() {
@@ -2032,11 +2176,13 @@ class ArrstackDownloadsCard extends ArrstackImportCardBase {
       refresh_seconds: 15,
       max_items: 10,
       show_posters: true,
+      show_unknown: true,
+      columns: [...ARRSTACK_QUEUE_DEFAULT_COLUMNS],
     };
   }
 
   _defaults() {
-    return { max_items: 10, show_posters: true };
+    return { max_items: 10, show_posters: true, show_unknown: true };
   }
 
   async _load() {
@@ -2059,9 +2205,7 @@ class ArrstackDownloadsCard extends ArrstackImportCardBase {
     if (!this._config) return;
     const active = this.shadowRoot.activeElement;
     const focusedItem = active?.classList.contains('act-check') ? active.closest('[data-item]')?.dataset.item : null;
-    this.shadowRoot.innerHTML = `<style>${ARRSTACK_STYLES}
-      .act-check { color: var(--arr-text); background: var(--arr-surface); }
-      </style>
+    this.shadowRoot.innerHTML = `<style>${ARRSTACK_STYLES}${ARRSTACK_DOWNLOADS_STYLES}</style>
       <ha-card>
         ${this._head("download", this._headMeta())}
         ${this._message ? `<div class="notice" role="status">${escapeHtml(this._message)}</div>` : ""}
@@ -2070,6 +2214,10 @@ class ArrstackDownloadsCard extends ArrstackImportCardBase {
       </ha-card>`;
     this.shadowRoot.querySelector(".act-retry")?.addEventListener("click",()=>this._load());
     this.shadowRoot.querySelectorAll(".act-check").forEach(button=>button.addEventListener("click",()=>this._check(Number(button.closest('[data-item]').dataset.item))));
+    this.shadowRoot.querySelectorAll('[data-page]').forEach(button=>button.addEventListener('click',()=>{
+      const direction=Number(button.dataset.page); this._page=(this._page||0)+direction;
+      this._render(); this.shadowRoot.querySelector(`[data-page="${direction}"]:not([disabled])`)?.focus();
+    }));
     if (focusedItem && !this._dialog?.isConnected) requestAnimationFrame(()=>{
       if (!this.isConnected || this._dialog?.isConnected) return;
       let current = document.activeElement;
@@ -2090,19 +2238,26 @@ class ArrstackDownloadsCard extends ArrstackImportCardBase {
     return speed ? `${total} · ${speed}` : `${total}`;
   }
 
+  _columns() { return queueColumns(this._config.columns); }
+
   _body() {
     const t = this._t();
-    if (this._error) {
-      return this._errorMarkup(this._error,t.fehler_allgemein);
-    }
-    if (!this._data) {
-      return `<div class="notice">${escapeHtml(t.laden)}</div>`;
-    }
-    const items = (this._data.items || []).slice(0, Number(this._config.max_items) || 10);
-    if (!items.length) {
-      return this._empty("download", t.leer);
-    }
-    return `<div class="rows">${items.map((item) => this._row(item)).join("")}</div>`;
+    if (this._error) return this._errorMarkup(this._error,t.fehler_allgemein);
+    if (!this._data) return `<div class="notice" role="status">${escapeHtml(t.laden)}</div>`;
+    const items=(this._data.items || []).filter(item=>this._config.show_unknown!==false || !item.unknown);
+    if (!items.length) return this._empty("download",t.leer);
+    const pageSize=Math.max(1,Math.min(200,Number(this._config.max_items)||10));
+    const pages=Math.ceil(items.length/pageSize);
+    this._page=Math.max(0,Math.min(pages-1,this._page||0));
+    const columns=this._columns();
+    const widths=columns.map(key=>key==='title' ? 'minmax(0,3fr)' : 'minmax(0,1fr)');
+    if (this._config.show_posters) widths.unshift('var(--queue-poster)');
+    widths.push('var(--queue-action)');
+    const pageLabel=fuelle(t.seite,{n:this._page+1,total:pages});
+    return `<div role="table" aria-label="${escapeHtml(t.kartentitel)}" class="queue-table${columns.length>6 ? ' expanded' : ''}${this._config.show_posters ? '' : ' no-posters'}" style="--queue-columns:${widths.join(' ')};${this._config.show_posters ? '' : '--queue-poster:0px;'}">
+      <div class="queue-grid queue-header" role="row">${this._config.show_posters ? `<span role="columnheader" aria-label="${escapeHtml(t.poster)}"></span>` : ''}${columns.map(key=>`<span role="columnheader" class="queue-cell" data-column="${key}">${escapeHtml(queueColumnLabel(key,this._sprache()))}</span>`).join('')}<span role="columnheader" aria-label="${escapeHtml(t.aktionen)}"></span></div>
+      ${items.slice(this._page*pageSize,(this._page+1)*pageSize).map(item=>this._row(item)).join('')}</div>
+      ${pages>1 ? `<div class="queue-pages"><button class="quiet" data-page="-1" ${this._page===0 || this._busy ? 'disabled' : ''}>${escapeHtml(t.vorherige)}</button><span class="queue-page-label" role="status">${escapeHtml(pageLabel)} · ${items.length}</span><button class="quiet" data-page="1" ${this._page===pages-1 || this._busy ? 'disabled' : ''}>${escapeHtml(t.naechste)}</button></div>` : ''}`;
   }
 
   _canInspect(item) {
@@ -2114,43 +2269,29 @@ class ArrstackDownloadsCard extends ArrstackImportCardBase {
   }
 
   _row(item) {
-    const t = this._t();
-    // SABnzbd liefert `percentage`/`mbleft`, die *arr-Apps `progress`/`sizeleft`.
-    const progress =
-      item.progress != null ? Number(item.progress) : Number(item.percentage) || 0;
-    // Restgröße nur, solange etwas übrig ist — „0 B" unter einem fertigen
-    // Download liest sich wie ein Fehler.
-    const leftBytes =
-      item.sizeleft != null
-        ? Number(item.sizeleft)
-        : item.mbleft != null
-          ? Number(item.mbleft) * 1024 * 1024
-          : 0;
-    const remaining = leftBytes > 0 ? formatBytes(leftBytes, t) : "";
-    const title = item.parent_title || item.title || "";
-    const meta = [item.episode, item.category]
-      .filter(Boolean)
-      .join(" · ");
-    const status = queueStatusText(item, t);
-    const poster = this._config.show_posters
-      ? posterMarkup(item.poster, this._data && this._data.brand, "download")
-      : "";
-    const rest = formatTimeleft(item.timeleft, t) || remaining;
-    return `<div class="row" data-item="${this._id(item)}">
-      ${poster}
-      <div class="row-main">
-        <div class="row-title">${escapeHtml(title)}</div>
-        <div class="row-meta">${escapeHtml(meta)}</div>
-        <div class="bar"><i style="width: ${Math.max(0, Math.min(100, progress))}%"></i></div>
-        ${this._canInspect(item) ? `<div class="actions"><button class="act-check quiet" aria-label="${escapeHtml(`${t.dialog_pruefen}: ${title}`)}" ${this._busy ? "disabled" : ""}>${escapeHtml(t.dialog_pruefen)}</button></div>` : ""}
-      </div>
-      <div class="row-side">
-        <span class="lead">${Math.round(progress)} %</span>
-        ${status ? `<span class="status-badge ${queueTone(item)}">${escapeHtml(status)}</span>` : ""}
-        ${rest ? `<span class="sub">${escapeHtml(rest)}</span>` : ""}
-      </div>
+    const t=this._t(),title=item.parent_title || item.title || '';
+    const progress=Math.max(0,Math.min(100,Number(item.progress ?? item.percentage)||0));
+    const leftBytes=item.sizeleft!=null ? Number(item.sizeleft) : Number(item.mbleft||0)*1024*1024;
+    const values={...item,title,release_title:item.title,timeleft:formatTimeleft(item.timeleft,t) || (leftBytes>0 ? formatBytes(leftBytes,t) : ''),size:item.size!=null ? formatBytes(item.size,t) : ''};
+    const cells=this._columns().map(key=>{
+      let value=values[key];
+      if (Array.isArray(value)) value=value.join(' · ');
+      let markup;
+      if (key==='status') markup=`<span class="status-badge ${queueTone(item)}">${escapeHtml(queueStatusText(item,t) || '—')}</span>`;
+      else if (key==='progress') markup=`<div class="queue-progress"><span>${Math.round(progress)} %</span><div class="bar" role="progressbar" aria-label="${escapeHtml(queueColumnLabel(key,this._sprache()))}" aria-valuenow="${progress}" aria-valuemin="0" aria-valuemax="100"><i style="width:${progress}%"></i></div></div>`;
+      else markup=`<span class="queue-value" title="${escapeHtml(value ?? '')}">${escapeHtml(value==null || value==='' ? '—' : value)}</span>`;
+      return `<div role="cell" class="queue-cell" data-column="${key}" aria-label="${escapeHtml(queueColumnLabel(key,this._sprache()))}"><span class="queue-label">${escapeHtml(queueColumnLabel(key,this._sprache()))}</span>${markup}</div>`;
+    }).join('');
+    const problem=this._itemErrors.get(this._id(item));
+    const reasons=(item.messages || []).filter(message=>typeof message==='string' && message.trim());
+    return `<div role="row" class="queue-grid queue-row" data-item="${this._id(item)}">
+      ${this._config.show_posters ? `<div role="cell" aria-label="${escapeHtml(t.poster)}" class="queue-poster">${posterMarkup(item.poster,this._data?.brand,'download')}</div>` : ''}
+      <div class="queue-fields">${cells}</div>
+      <div role="cell" aria-label="${escapeHtml(t.aktionen)}" class="queue-action">${this._canInspect(item) ? `<button class="act-check quiet" title="${escapeHtml(t.dialog_pruefen)}" aria-label="${escapeHtml(`${t.dialog_pruefen}: ${title}`)}" ${this._busy ? 'disabled' : ''}>${arrIcon('search')}</button>` : ''}</div>
+      ${problem || reasons.length ? `<div role="cell" aria-label="${escapeHtml(t.import_status)}" class="queue-reasons">${problem ? this._importErrorMarkup(problem,t.import_fehler) : ''}${reasons.length ? `<details class="queue-message"><summary>${arrIcon("alert")}<span>${escapeHtml(t.import_hinweise)} (${reasons.length})</span></summary>${reasons.map(reason=>`<p>${escapeHtml(reason)}</p>`).join('')}</details>` : ''}</div>` : ''}
     </div>`;
   }
+
 }
 
 /* ── Karte 2: zuletzt hinzugefügt ───────────────────────────────────────── */
@@ -2320,7 +2461,7 @@ class ArrstackFixCard extends ArrstackImportCardBase {
         <div class="row-meta">${escapeHtml(item.episode || item.title || "")}</div>
         <div class="bar" role="progressbar" aria-valuenow="${Math.max(0,Math.min(100,Number(item.progress)||0))}" aria-valuemin="0" aria-valuemax="100" aria-label="${escapeHtml(t.fortschritt || t.kartentitel)}"><i style="width:${Math.max(0,Math.min(100,Number(item.progress)||0))}%"></i></div>
         <span class="status-badge ${complete ? (ready ? "success" : "warning") : queueTone(item)}">${escapeHtml(`${Math.round(Number(item.progress)||0)} % · ${status}`)}</span>
-        ${problem ? this._errorMarkup(problem,t.import_fehler,false) : ""}
+        ${problem ? this._importErrorMarkup(problem,t.import_fehler) : ""}
       </div>
       <div class="actions">
         ${ready ? `<label class="select-label"><input type="checkbox" class="item-select" aria-label="${escapeHtml(`${t.auswahl_importieren}: ${item.parent_title || item.title}`)}" ${this._selected.has(id) ? "checked" : ""} ${this._busy ? "disabled" : ""}></label><button class="act-import quiet" ${this._busy ? "disabled" : ""}>${escapeHtml(t.importieren)}</button>` : ""}
@@ -2695,11 +2836,7 @@ customElements.define("arrstack-seer-card", ArrstackSeerCard);
 
 customElements.define(
   "arrstack-downloads-card-editor",
-  ArrstackCardEditor.forServices(
-    ["sonarr", "radarr", "sabnzbd"],
-    SCHEMA_ARRSTACK_DOWNLOADS_CARD,
-    TEXTE_ARRSTACK_DOWNLOADS_CARD
-  )
+  ArrstackDownloadsEditor
 );
 customElements.define(
   "arrstack-recent-card-editor",

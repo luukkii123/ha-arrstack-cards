@@ -340,7 +340,7 @@ try:
         page.goto(f"http://127.0.0.1:{PORT}/page.html", wait_until="load")
         page.wait_for_function(
             "window.__cards && window.__cards.downloads "
-            "&& window.__cards.downloads.shadowRoot.querySelector('.rows, .empty')",
+            "&& window.__cards.downloads.shadowRoot.querySelector('.queue-table, .empty')",
             timeout=20000,
         )
         page.wait_for_timeout(400)
