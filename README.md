@@ -229,6 +229,17 @@ fehlende Poster, Tastaturöffnung der Suchtreffer, Fokus, Textgrenzen und
 Aktionsflächen. Die Editorbilder verwenden eine sichtbare `ha-form`-Attrappe;
 ein echter HA-Editor und ein Speichervorgang sind damit nicht nachgewiesen.
 
+### Geprüft — 14.10.2026 · 0.6.1 · UI-Zustand #256
+
+Beim periodischen Aktualisieren der Warteschlange bleiben stabile Zeilen,
+Checkboxauswahl, Fokus, offene Hinweise, Seitenauswahl und Scrollposition
+erhalten. Der offene Importdialog behält seine Kandidatenauswahl und seinen
+Fokus. Die Abnahme mit synthetischen Daten steht in
+[docs/abnahme-2026-10-14-ui-state.md](docs/abnahme-2026-10-14-ui-state.md).
+Unabhängige Review ohne verbleibende P1/P2-Befunde; finale native HA-Abnahme
+170/170 Checks ohne Seitenfehler oder unbehandelte Fehler. Keine produktiven
+Medienaktionen ausgeführt.
+
 ## Lizenz
 
 MIT

@@ -316,6 +316,41 @@ with sync_playwright() as pw:
     check('compact-pagination',"() => window.__cards.fix._page===1 && window.__cards.fix.shadowRoot.querySelectorAll('.import-row').length===5")
     page.locator('codex-arrcompact-fix-card .act-prev').click()
     check('pagination-preserves-selection',"() => window.__cards.fix._selected.has(42) && window.__cards.fix._selected.has(45)")
+    # A periodic queue refresh must retain the current page, selection, scroll
+    # position, and keyboard target for the row the user is working on.
+    page.evaluate("""()=>{const c=window.__cards.fix;const rows=c.shadowRoot.querySelector('.rows');
+      PROBLEMS.push(...Array.from({length:12},(_,index)=>({...PROBLEMS[1],id:100+index,queue_item_id:100+index,title:`Weiterer Film ${index}`})));
+      c._page=2;c._render();const list=c.shadowRoot.querySelector('.rows');
+      const sheet=new CSSStyleSheet();sheet.replaceSync('.rows{max-height:140px;overflow-y:auto}');
+      c.shadowRoot.adoptedStyleSheets=[...c.shadowRoot.adoptedStyleSheets,sheet];
+      c._selected.add(109);c._render();const scrollList=c.shadowRoot.querySelector('.rows');scrollList.scrollTop=10000;
+      c.shadowRoot.querySelector('[data-item="109"] .item-select').focus();
+      window.__pollStateBefore={page:c._page,scroll:scrollList.scrollTop};}""")
+    page.evaluate('async()=>await window.__cards.fix._load()')
+    check('queue-poll-preserves-page-selection-focus-scroll',"() => {const c=window.__cards.fix,rows=c.shadowRoot.querySelector('.rows'),active=c.shadowRoot.activeElement;return c._page===window.__pollStateBefore.page && c._selected.has(42) && c._selected.has(45) && c._selected.has(109) && active?.classList.contains('item-select') && active.closest('[data-item]')?.dataset.item==='109' && active.checked && rows.scrollTop===window.__pollStateBefore.scroll;}")
+    page.evaluate('()=>PROBLEMS.reverse()')
+    page.evaluate('async()=>await window.__cards.fix._load()')
+    check('queue-poll-reorders-dynamic-rows',"() => {const c=window.__cards.fix,ids=[...c.shadowRoot.querySelectorAll('.import-row')].map(row=>Number(row.dataset.item));return c._page===2 && ids.join(',')==='101,100,45,44,43';}")
+    page.evaluate("()=>PROBLEMS.splice(PROBLEMS.findIndex(item=>item.queue_item_id===100),1)")
+    page.evaluate('async()=>await window.__cards.fix._load()')
+    check('queue-poll-removes-dynamic-rows',"() => {const c=window.__cards.fix,ids=[...c.shadowRoot.querySelectorAll('.import-row')].map(row=>Number(row.dataset.item));return c._page===2 && !ids.includes(100) && ids.join(',')==='101,45,44,43,42';}")
+    # Reordering stable keyed rows, or removing a preceding row, must not blur
+    # the same still-present control the user was working with.
+    page.evaluate("""()=>{const c=window.__cards.fix;window.__focusProblemsBefore=[...PROBLEMS];
+      PROBLEMS.splice(0,PROBLEMS.length,...[801,802,803].map(id=>({...PROBLEMS[0],id,queue_item_id:id,title:`Fokus ${id}`})));
+      c._page=0;c._selected.clear();}""")
+    page.evaluate('async()=>await window.__cards.fix._load()')
+    page.evaluate("""()=>{const c=window.__cards.fix;window.__focusedQueueControl=c.shadowRoot.querySelector('[data-item="802"] .item-select');window.__focusedQueueControl.focus();
+      const first=PROBLEMS[0];PROBLEMS[0]=PROBLEMS[1];PROBLEMS[1]=first;}""")
+    page.evaluate('async()=>await window.__cards.fix._load()')
+    check('queue-keyed-reorder-preserves-focus',"() => {const c=window.__cards.fix,active=c.shadowRoot.activeElement;return active===window.__focusedQueueControl && active?.isConnected && active.closest('[data-item]')?.dataset.item==='802';}")
+    page.evaluate("()=>PROBLEMS.sort((left,right)=>left.queue_item_id-right.queue_item_id)")
+    page.evaluate('async()=>await window.__cards.fix._load()')
+    check('queue-keyed-return-order-preserves-focus',"() => {const c=window.__cards.fix;return c.shadowRoot.activeElement===window.__focusedQueueControl && c.shadowRoot.querySelector('.import-row').dataset.item==='801';}")
+    page.evaluate("()=>PROBLEMS.splice(PROBLEMS.findIndex(item=>item.queue_item_id===801),1)")
+    page.evaluate('async()=>await window.__cards.fix._load()')
+    check('queue-preceding-removal-preserves-focus',"() => {const c=window.__cards.fix,active=c.shadowRoot.activeElement;return active===window.__focusedQueueControl && active?.isConnected && active.closest('[data-item]')?.dataset.item==='802' && !PROBLEMS.some(item=>item.queue_item_id===801);}")
+    page.evaluate("""async()=>{PROBLEMS.splice(0,PROBLEMS.length,...window.__focusProblemsBefore);await window.__cards.fix._load()}""")
     page.evaluate("()=>window.__cards.fix._fragLoeschen(41,'Synthetischer Titel')")
     page.locator('codex-arrcompact-dialog .scrim').click(position={'x':4,'y':4})
     check('confirmation-scrim-protected',"() => !!document.querySelector('codex-arrcompact-dialog')")
@@ -328,10 +363,13 @@ with sync_playwright() as pw:
     check('queue-sab-no-import',"() => !window.__cards.downloads.shadowRoot.querySelector('.act-check')")
     page.evaluate("()=>{const c=window.__cards.downloads;c._data.service='sonarr';c._render();window.__queueCallsBefore=window.__wsCalls.length;c.shadowRoot.querySelector('[data-item=\"41\"] .act-check').focus()}")
     page.locator('codex-arrcompact-downloads-card [data-item=\"41\"] .act-check').focus()
+    page.locator('codex-arrcompact-downloads-card .queue-row .queue-message summary').first.click()
+    page.locator('codex-arrcompact-downloads-card .queue-row .act-check').first.focus()
     check('queue-keyboard-focus-before-poll',"() => window.__cards.downloads.shadowRoot.activeElement?.classList.contains('act-check')")
     page.evaluate('async()=>await window.__cards.downloads._load()')
     page.wait_for_function("window.__cards.downloads.shadowRoot.activeElement?.closest('[data-item]')?.dataset.item==='41'")
     check('queue-keyboard-focus-after-poll',"() => window.__cards.downloads.shadowRoot.activeElement?.closest('[data-item]')?.dataset.item==='41'")
+    check('queue-details-open-after-poll',"() => window.__cards.downloads.shadowRoot.querySelector('.queue-row .queue-message')?.open===true")
     page.evaluate('window.__queueCallsBefore=window.__wsCalls.length')
     page.keyboard.press('Enter')
     page.wait_for_function('!!window.__cards.downloads._open?.candidates?.length')
@@ -342,6 +380,9 @@ with sync_playwright() as pw:
     page.keyboard.press('Tab')
     check('queue-dialog-tab-trap',"() => document.querySelector('codex-arrcompact-dialog').shadowRoot.activeElement.classList.contains('dlg-close')")
     page.locator('codex-arrcompact-dialog .candidate-radio').first.check()
+    page.locator('codex-arrcompact-dialog .candidate-radio').first.focus()
+    page.evaluate('async()=>await window.__cards.downloads._load()')
+    check('queue-poll-preserves-open-import-dialog',"() => {const dialog=document.querySelector('codex-arrcompact-dialog'),radio=dialog?.shadowRoot.querySelector('.candidate-radio');return !!dialog && radio?.checked && dialog.shadowRoot.activeElement===radio && window.__cards.downloads._open.candidate_id==='1';}")
     page.keyboard.press('Escape')
     check('queue-dirty-escape',"() => !!document.querySelector('codex-arrcompact-dialog').shadowRoot.querySelector('[data-akt=keep]')")
     page.locator('codex-arrcompact-dialog [data-akt=keep]').click()

@@ -230,7 +230,7 @@ const BuschUI = (() => {
  *  - Regel 4: Farben, Abstände und Schriftgrößen nur über Theme-Variablen.
  */
 
-const CARD_VERSION = "0.6.0";
+const CARD_VERSION = "0.6.1";
 
 const DOCS_URL = "https://github.com/luukkii123/ha-arrstack-cards";
 
@@ -2099,6 +2099,76 @@ class ArrstackImportCardBase extends ArrstackCardBase {
 
 }
 
+/** Aktualisiert das Queue-Markup, ohne stabile Zeilen und Controls auszutauschen. */
+function patchQueueChildren(target, source) {
+  const wanted = [...source.childNodes];
+  let index = 0;
+  for (const next of wanted) {
+    let current = target.childNodes[index];
+    const key = next.nodeType === 1 ? next.getAttribute("data-item") : null;
+    const matches = node => node && node.nodeType === next.nodeType &&
+      (node.nodeType !== 1 || (node.localName === next.localName &&
+        ((node.getAttribute("data-item") || null) === key) &&
+        ((node.id || null) === (next.id || null)) &&
+        ((node.classList[0] || null) === (next.classList[0] || null))));
+    if (!matches(current)) {
+      const later = [...target.childNodes].slice(index).find(node => matches(node));
+      if (later) {
+        target.insertBefore(later, current || null);
+        current = later;
+      } else {
+        current = next.cloneNode(true);
+        target.insertBefore(current, target.childNodes[index] || null);
+      }
+    }
+    if (current.nodeType === 3 || current.nodeType === 8) {
+      if (current.nodeValue !== next.nodeValue) current.nodeValue = next.nodeValue;
+    } else if (current.nodeType === 1) {
+      const detailsOpen = current.localName === "details" && current.open;
+      for (const attribute of [...current.attributes]) {
+        if (!next.hasAttribute(attribute.name)) current.removeAttribute(attribute.name);
+      }
+      for (const attribute of [...next.attributes]) {
+        if (current.getAttribute(attribute.name) !== attribute.value) {
+          current.setAttribute(attribute.name, attribute.value);
+        }
+      }
+      if (current.localName === "input" && ["checkbox", "radio"].includes(current.type)) {
+        current.checked = next.checked;
+      }
+      if (current.localName === "details") current.open = next.open || detailsOpen;
+      patchQueueChildren(current, next);
+    }
+    index += 1;
+  }
+  while (target.childNodes.length > index) target.lastChild.remove();
+}
+
+function patchQueueMarkup(root, markup) {
+  const focused = root.activeElement;
+  const template = document.createElement("template");
+  template.innerHTML = markup;
+  patchQueueChildren(root, template.content);
+  // Moving a keyed row can blur its active descendant even though the node is
+  // still connected. Restore only when focus fell back to an ancestor of this
+  // card; a dialog or another control outside the card must keep its focus.
+  let active = document.activeElement;
+  while (active?.shadowRoot?.activeElement) active = active.shadowRoot.activeElement;
+  let hostAncestor = root.host;
+  let focusStayedOnHostChain = false;
+  while (hostAncestor) {
+    if (hostAncestor === active) {
+      focusStayedOnHostChain = true;
+      break;
+    }
+    hostAncestor = hostAncestor.parentNode;
+    if (hostAncestor instanceof ShadowRoot) hostAncestor = hostAncestor.host;
+  }
+  if (focused?.isConnected && root.activeElement === null && focusStayedOnHostChain) {
+    focused.focus({preventScroll:true});
+  }
+}
+
 const ARRSTACK_DOWNLOADS_STYLES = `
   .queue-table { --queue-columns:minmax(0,1fr); --queue-poster: var(--arr-poster-w); --queue-action: 44px; }
   .queue-grid { display:grid; grid-template-columns:var(--queue-columns); align-items:center; gap:var(--arr-space-3); min-width:0; }
@@ -2205,19 +2275,20 @@ class ArrstackDownloadsCard extends ArrstackImportCardBase {
     if (!this._config) return;
     const active = this.shadowRoot.activeElement;
     const focusedItem = active?.classList.contains('act-check') ? active.closest('[data-item]')?.dataset.item : null;
-    this.shadowRoot.innerHTML = `<style>${ARRSTACK_STYLES}${ARRSTACK_DOWNLOADS_STYLES}</style>
+    patchQueueMarkup(this.shadowRoot, `<style>${ARRSTACK_STYLES}${ARRSTACK_DOWNLOADS_STYLES}</style>
       <ha-card>
         ${this._head("download", this._headMeta())}
         ${this._message ? `<div class="notice" role="status">${escapeHtml(this._message)}</div>` : ""}
         ${this._operationError ? this._errorMarkup(this._operationError,this._t().import_fehler,false) : ""}
         ${this._body()}
-      </ha-card>`;
-    this.shadowRoot.querySelector(".act-retry")?.addEventListener("click",()=>this._load());
-    this.shadowRoot.querySelectorAll(".act-check").forEach(button=>button.addEventListener("click",()=>this._check(Number(button.closest('[data-item]').dataset.item))));
-    this.shadowRoot.querySelectorAll('[data-page]').forEach(button=>button.addEventListener('click',()=>{
+      </ha-card>`);
+    const retry = this.shadowRoot.querySelector(".act-retry");
+    if (retry) retry.onclick = () => this._load();
+    this.shadowRoot.querySelectorAll(".act-check").forEach(button=>button.onclick=()=>this._check(Number(button.closest('[data-item]').dataset.item)));
+    this.shadowRoot.querySelectorAll('[data-page]').forEach(button=>button.onclick=()=>{
       const direction=Number(button.dataset.page); this._page=(this._page||0)+direction;
       this._render(); this.shadowRoot.querySelector(`[data-page="${direction}"]:not([disabled])`)?.focus();
-    }));
+    });
     if (focusedItem && !this._dialog?.isConnected) requestAnimationFrame(()=>{
       if (!this.isConnected || this._dialog?.isConnected) return;
       let current = document.activeElement;
@@ -2425,7 +2496,7 @@ class ArrstackFixCard extends ArrstackImportCardBase {
     const pages = Math.max(1,Math.ceil(items.length/pageSize));
     this._page = Math.min(this._page,pages-1);
     const visible = items.slice(this._page*pageSize,(this._page+1)*pageSize);
-    this.shadowRoot.innerHTML = `<style>${ARRSTACK_STYLES}${ARRSTACK_COMPACT}</style><ha-card>
+    patchQueueMarkup(this.shadowRoot, `<style>${ARRSTACK_STYLES}${ARRSTACK_COMPACT}</style><ha-card>
       ${this._head("download", items.length ? fuelle(t.offen, {n:items.length}) : "", "warning")}
       ${this._message ? `<div class="notice" role="status">${escapeHtml(this._message)}</div>` : ""}
       ${this._operationError ? this._errorMarkup(this._operationError,t.import_fehler,false) : ""}
@@ -2439,7 +2510,7 @@ class ArrstackFixCard extends ArrstackImportCardBase {
         <button class="act-bulk quiet" ${this._busy || !ready.length ? "disabled" : ""}>${arrIcon("download")}<span class="lbl">${escapeHtml(t.bulk)}</span></button>
         <button class="act-refresh quiet" ${this._loading || this._busy ? "disabled" : ""}>${escapeHtml(t.neu_laden)}</button>
         ${this._selected.size ? `<span class="chip">${escapeHtml(fuelle(t.ausgewaehlt,{n:this._selected.size}))}</span><button class="act-selected quiet" ${this._busy ? "disabled" : ""}>${escapeHtml(t.auswahl_importieren)}</button>` : ""}
-      </div>` : ""}</ha-card>`;
+      </div>` : ""}</ha-card>`);
     this._bind();
   }
 
@@ -2472,7 +2543,7 @@ class ArrstackFixCard extends ArrstackImportCardBase {
   }
 
   _bind() {
-    const bind = (selector,callback) => this.shadowRoot.querySelector(selector)?.addEventListener("click",callback);
+    const bind = (selector,callback) => { const node=this.shadowRoot.querySelector(selector); if(node) node.onclick=callback; };
     bind(".act-retry",()=>this._load());
     bind(".act-refresh",()=>this._load());
     bind(".act-prev",()=>{this._page=Math.max(0,this._page-1);this._render();this.shadowRoot.querySelector('.act-prev')?.focus();});
@@ -2481,9 +2552,12 @@ class ArrstackFixCard extends ArrstackImportCardBase {
     bind(".act-selected",()=>this._importSelected());
     this.shadowRoot.querySelectorAll(".row.import-row").forEach(row => {
       const id = Number(row.dataset.item), item = this._data.items.find(item => this._id(item) === id);
-      row.querySelector(".act-import")?.addEventListener("click",()=>this._import(id));
-      row.querySelector(".act-check")?.addEventListener("click",()=>this._check(id));
-      row.querySelector(".act-delete")?.addEventListener("click",()=>this._fragLoeschen(id,item.parent_title || item.title));
+      const importButton=row.querySelector(".act-import");
+      if(importButton) importButton.onclick=()=>this._import(id);
+      const checkButton=row.querySelector(".act-check");
+      if(checkButton) checkButton.onclick=()=>this._check(id);
+      const deleteButton=row.querySelector(".act-delete");
+      if(deleteButton) deleteButton.onclick=()=>this._fragLoeschen(id,item.parent_title || item.title);
       const toggle = event => {
         if (this._busy || !this._ready(item)) return;
         const checked = !this._selected.has(id);
@@ -2494,8 +2568,9 @@ class ArrstackFixCard extends ArrstackImportCardBase {
         this._render();
         this.shadowRoot.querySelector(`.row[data-item="${id}"] input`)?.focus();
       };
-      row.querySelector(".item-select")?.addEventListener("click",toggle);
-      row.addEventListener("click",event=>{ if ((event.ctrlKey || event.metaKey || event.shiftKey) && !event.target.closest("button,input,label")) toggle(event); });
+      const checkbox=row.querySelector(".item-select");
+      if(checkbox) checkbox.onclick=toggle;
+      row.onclick=event=>{ if ((event.ctrlKey || event.metaKey || event.shiftKey) && !event.target.closest("button,input,label")) toggle(event); };
     });
   }
 
