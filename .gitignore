@@ -1,0 +1,13 @@
+node_modules/
+.DS_Store
+Thumbs.db
+
+# Ergebnisse des Render-Laufs — erzeugt, nicht gepflegt.
+docs/render/ergebnis/
+
+# Nur lokal sinnvoll: Agent-Einstiege, Design-Audits, Abnahmeberichte.
+AGENTS.md
+CLAUDE.md
+docs/abnahme-*.md
+docs/design-audit-*.md
+docs/design-glossar.md

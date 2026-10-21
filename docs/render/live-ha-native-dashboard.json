@@ -1,0 +1,28 @@
+{
+  "views": [
+    {
+      "title": "Test downloads",
+      "path": "downloads",
+      "type": "panel",
+      "cards": [{"type": "custom:codex-arrstack-downloads-card", "title": "Synthetischer downloads Test", "entry_id": "codex-synthetic-entry", "refresh_seconds": 0}]
+    },
+    {
+      "title": "Test recent",
+      "path": "recent",
+      "type": "panel",
+      "cards": [{"type": "custom:codex-arrstack-recent-card", "title": "Synthetischer recent Test", "entry_id": "codex-synthetic-entry", "refresh_seconds": 0}]
+    },
+    {
+      "title": "Test fix",
+      "path": "fix",
+      "type": "panel",
+      "cards": [{"type": "custom:codex-arrstack-fix-card", "title": "Synthetischer fix Test", "entry_id": "codex-synthetic-entry", "refresh_seconds": 0}]
+    },
+    {
+      "title": "Test seer",
+      "path": "seer",
+      "type": "panel",
+      "cards": [{"type": "custom:codex-arrstack-seer-card", "title": "Synthetischer seer Test", "entry_id": "codex-synthetic-entry", "refresh_seconds": 0}]
+    }
+  ]
+}
