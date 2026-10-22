@@ -2,6 +2,8 @@
 """Shared UI contract 0.1.0: card/editor geometry and reviewed PNG baselines.
 
 Run after render.py: python3 visual-contract.py <render-output> [--record]
+Baselines are compared per pixel with a narrow tolerance (TOLERANZ_KANAL,
+TOLERANZ_ANTEIL): anti-aliasing noise passes, moved or changed elements fail.
 The ha-form renderer is a visual stand-in; editor behavior has a separate test.
 """
 
@@ -21,6 +23,35 @@ record = "--record" in sys.argv[2:]
 baseline = pathlib.Path(__file__).parent / "baselines" / "ui-0.1.0"
 files = [f"alle-{width}-{theme}.png" for width in (320, 390, 480, 960) for theme in ("light", "dark")]
 files += [f"editoren-{width}-{theme}.png" for width in (320, 390, 480, 960) for theme in ("light", "dark")]
+
+
+TOLERANZ_KANAL = 8        # hoechstens 8/255 je Farbkanal gilt als gleich
+TOLERANZ_ANTEIL = 0.001   # hoechstens 0,1 % abweichende Pixel je Bild
+
+
+def bildvergleich(page, soll, ist):
+    """Dekodiert beide PNGs in Chromium und zaehlt abweichende Pixel."""
+    import base64
+    return page.evaluate("""async ([a, b, toleranz]) => {
+      const lade = s => new Promise((ok, fehler) => {const i = new Image();
+        i.onload = () => ok(i); i.onerror = fehler; i.src = 'data:image/png;base64,' + s;});
+      const [A, B] = [await lade(a), await lade(b)];
+      const pixel = i => {const c = document.createElement('canvas'); c.width = i.width;
+        c.height = i.height; const x = c.getContext('2d'); x.drawImage(i, 0, 0);
+        return x.getImageData(0, 0, i.width, i.height).data;};
+      const r = {groesse_soll: [A.width, A.height], groesse_ist: [B.width, B.height],
+        abweichend: 0, max_kanal: 0, anteil: 1};
+      if (A.width !== B.width || A.height !== B.height) return r;
+      const da = pixel(A), db = pixel(B);
+      for (let i = 0; i < da.length; i += 4) {
+        const d = Math.max(Math.abs(da[i] - db[i]), Math.abs(da[i + 1] - db[i + 1]),
+          Math.abs(da[i + 2] - db[i + 2]), Math.abs(da[i + 3] - db[i + 3]));
+        if (d > r.max_kanal) r.max_kanal = d;
+        if (d > toleranz) r.abweichend++;
+      }
+      r.anteil = r.abweichend / (A.width * A.height);
+      return r;
+    }""", [base64.b64encode(soll).decode(), base64.b64encode(ist).decode(), TOLERANZ_KANAL])
 
 
 class Handler(http.server.SimpleHTTPRequestHandler):
@@ -270,12 +301,32 @@ if record and not findings:
     for name in files:
         shutil.copy2(out / name, baseline / name)
 else:
-    for name in files:
-        if not (baseline / name).exists():
-            findings.append(f"Baseline fehlt: {name}")
-        elif (out / name).read_bytes() != (baseline / name).read_bytes():
-            current = hashlib.sha256((out / name).read_bytes()).hexdigest()[:12]
-            findings.append(f"Bildabweichung: {name} ({current})")
+    # Pixelvergleich mit enger Toleranz statt Byte-Gleichheit: Chromium
+    # glaettet Textkanten nicht in jedem Lauf bitgleich (beobachtet: 14 Pixel,
+    # Kanalabweichung 4/255). Ein Pixel gilt als abweichend, sobald ein Kanal
+    # um mehr als TOLERANZ_KANAL abweicht; ein Bild ist rot, wenn das auf mehr
+    # als TOLERANZ_ANTEIL aller Pixel zutrifft oder sich die Groesse aendert.
+    vergleiche = {}
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch(args=["--no-sandbox"])
+        page = browser.new_page()
+        for name in files:
+            if not (baseline / name).exists():
+                findings.append(f"Baseline fehlt: {name}")
+                continue
+            ist, soll = (out / name).read_bytes(), (baseline / name).read_bytes()
+            if ist == soll:
+                vergleiche[name] = {"gleich": True}
+                continue
+            ergebnis = bildvergleich(page, soll, ist)
+            vergleiche[name] = ergebnis
+            if (ergebnis["groesse_soll"] != ergebnis["groesse_ist"]
+                    or ergebnis["anteil"] > TOLERANZ_ANTEIL):
+                current = hashlib.sha256(ist).hexdigest()[:12]
+                findings.append(f"Bildabweichung: {name} ({current}) {ergebnis}")
+        browser.close()
+    checks["baseline-vergleich"] = {"toleranz_kanal": TOLERANZ_KANAL,
+                                    "toleranz_anteil": TOLERANZ_ANTEIL, "bilder": vergleiche}
 
 report = {"contract": "0.1.0", "checks": checks, "findings": findings}
 (out / "visual-contract.json").write_text(json.dumps(report, indent=2, ensure_ascii=False))
