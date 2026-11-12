@@ -230,7 +230,7 @@ const BuschUI = (() => {
  *  - Regel 4: Farben, Abstände und Schriftgrößen nur über Theme-Variablen.
  */
 
-const CARD_VERSION = "0.6.1";
+const CARD_VERSION = "0.6.2";
 
 const DOCS_URL = "https://github.com/luukkii123/ha-arrstack-cards";
 
@@ -509,7 +509,7 @@ const SCHEMA_ARRSTACK_DOWNLOADS_CARD = [
 const TEXTE_ARRSTACK_DOWNLOADS_CARD = {
   de: {
     name: "arrstack Downloads",
-    description: "Was gerade lädt — Sonarr, Radarr oder SABnzbd.",
+    description: "Zeigt, was gerade in Sonarr, Radarr oder SABnzbd lädt.",
     labels: {
       title: "Überschrift",
       entry_id: "Instanz",
@@ -540,7 +540,7 @@ const TEXTE_ARRSTACK_DOWNLOADS_CARD = {
   },
   en: {
     name: "arrstack downloads",
-    description: "What is downloading right now — Sonarr, Radarr or SABnzbd.",
+    description: "Shows what is downloading right now in Sonarr, Radarr or SABnzbd.",
     labels: {
       title: "Title",
       entry_id: "Instance",
@@ -584,7 +584,7 @@ const SCHEMA_ARRSTACK_RECENT_CARD = [
 const TEXTE_ARRSTACK_RECENT_CARD = {
   de: {
     name: "arrstack Zuletzt",
-    description: "Zuletzt in die Bibliothek aufgenommen.",
+    description: "Zeigt, was zuletzt in die Bibliothek aufgenommen wurde.",
     labels: {
       title: "Überschrift",
       entry_id: "Instanz",
@@ -607,7 +607,7 @@ const TEXTE_ARRSTACK_RECENT_CARD = {
   },
   en: {
     name: "arrstack recent",
-    description: "Most recently added to the library.",
+    description: "Shows what was most recently added to the library.",
     labels: {
       title: "Title",
       entry_id: "Instance",
@@ -643,7 +643,7 @@ const SCHEMA_ARRSTACK_FIX_CARD = [
 const TEXTE_ARRSTACK_FIX_CARD = {
   de: {
     name: "arrstack Import-Fix",
-    description: "Heruntergeladen, aber nicht importiert — mit Schnell-Reparatur.",
+    description: "Zeigt Heruntergeladenes, das nicht importiert wurde, mit Schnell-Reparatur.",
     labels: {
       max_items: 'Einträge pro Seite',
       title: "Überschrift",
@@ -696,7 +696,7 @@ const TEXTE_ARRSTACK_FIX_CARD = {
   },
   en: {
     name: "arrstack import fix",
-    description: "Downloaded but never imported — with a one-click repair.",
+    description: "Shows downloads that were never imported, with a one-click repair.",
     labels: {
       max_items: 'Items per page',
       title: "Title",
@@ -762,7 +762,7 @@ const SCHEMA_ARRSTACK_SEER_CARD = [
 const TEXTE_ARRSTACK_SEER_CARD = {
   de: {
     name: "arrstack Anfragen",
-    description: "In Jellyseerr suchen, Staffeln wählen, anfragen.",
+    description: "Sucht in Jellyseerr, wählt Staffeln und stellt Anfragen.",
     labels: {
       title: "Überschrift",
       entry_id: "Instanz",
@@ -807,7 +807,7 @@ const TEXTE_ARRSTACK_SEER_CARD = {
   },
   en: {
     name: "arrstack requests",
-    description: "Search in Jellyseerr, pick seasons, request.",
+    description: "Searches Jellyseerr, picks seasons and sends requests.",
     labels: {
       title: "Title",
       entry_id: "Instance",
@@ -2945,28 +2945,28 @@ window.customCards.push(
     type: "arrstack-downloads-card",
     name: TEXTE_ARRSTACK_DOWNLOADS_CARD[BROWSER_SPRACHE].name,
     description: TEXTE_ARRSTACK_DOWNLOADS_CARD[BROWSER_SPRACHE].description,
-    preview: true,
+    preview: false,
     documentationURL: DOCS_URL,
   },
   {
     type: "arrstack-recent-card",
     name: TEXTE_ARRSTACK_RECENT_CARD[BROWSER_SPRACHE].name,
     description: TEXTE_ARRSTACK_RECENT_CARD[BROWSER_SPRACHE].description,
-    preview: true,
+    preview: false,
     documentationURL: DOCS_URL,
   },
   {
     type: "arrstack-fix-card",
     name: TEXTE_ARRSTACK_FIX_CARD[BROWSER_SPRACHE].name,
     description: TEXTE_ARRSTACK_FIX_CARD[BROWSER_SPRACHE].description,
-    preview: true,
+    preview: false,
     documentationURL: DOCS_URL,
   },
   {
     type: "arrstack-seer-card",
     name: TEXTE_ARRSTACK_SEER_CARD[BROWSER_SPRACHE].name,
     description: TEXTE_ARRSTACK_SEER_CARD[BROWSER_SPRACHE].description,
-    preview: true,
+    preview: false,
     documentationURL: DOCS_URL,
   }
 );

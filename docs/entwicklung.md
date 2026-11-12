@@ -72,3 +72,13 @@ echter Browserzoom und vollständige Kontrastmessung aller Hostflächen. Beim
 Öffnen des nativen Karteneditors kann in manchen HA-Frontends ein
 `lit-virtualizer`-Registrierungskonflikt auftreten, der nicht von dieser Karte
 stammt.
+
+## Geprüft
+
+**12.11.2026 · 0.6.2, Kartenwähler ohne Live-Vorschau (#1011, Tag `v0.6.2`)** — vier Karten: Beschreibung je ein Satz mit Verb; `getStubConfig` liest `hass` nicht (Test).
+
+1. `node --check` grün; neue Tests `tests/kartenwaehler.test.js` (preview false, ein Satz Beschreibung de/en, höchstens ein Durchlauf je Register, kein Netz) zuerst rot, danach grün.
+2. `python3 scripts/ui-regeln-pruefen.py`: 0 Verstöße, mit der neuen Prüfung R3.6 (Kartenwähler-Vertrag), die vorher für dieses Repo rot war.
+3. Einziger Abnahmelauf `karten-alle.sh` für alle fünf geänderten Kartenrepos (Lauf `karten-20261112-175558-77c23e`): 5/5 Schritte grün, Node 5 Testdateien grün, 91 Bilder.
+4. Eintrag in `docs/stand.md` der Projektverwaltung, Block 12.11.2026 (#1011).
+
