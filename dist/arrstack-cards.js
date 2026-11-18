@@ -2433,6 +2433,7 @@ class ArrstackRecentCard extends ArrstackCardBase {
 
   _render() {
     if (!this._config) return;
+    // sink-ok: constant styles plus _head()/_body() markup, which escape every text field (tests/xss.test.js)
     this.shadowRoot.innerHTML = `<style>${ARRSTACK_STYLES}</style>
       <ha-card>
         ${this._head("download")}

@@ -27,7 +27,12 @@ node --check dist/arrstack-cards.js
 node tests/editor.test.js
 node tests/downloads.test.js
 node tests/import-seer.test.js
+node --test tests/*.test.js   # alle, auch poster.test.js und xss.test.js
 ```
+
+`tests/xss.test.js` rendert jede Karte mit den Payloads aus `XSS_PAYLOADS` in
+jedem Textfeld. Der CI-Schritt „Sinks“ meldet jede HTML-Senke mit `${…}` ohne
+`escapeHtml(` und ohne Markierung `// sink-ok: <Grund>`.
 
 ## Renderprüfung (Chromium, erfundene Daten)
 
