@@ -58,7 +58,7 @@ Gelten für alle vier Karten.
 | `title` | Text | je Karte (siehe unten) | Überschrift der Karte |
 | `entry_id` | Text | leer | Instanz (Konfigurationseintrag) der Integration. Leer: die einzige passende Instanz wird genommen; gibt es mehrere, fordert die Karte zur Auswahl auf. |
 | `service` | Text | leer | Diensttyp (`sonarr`, `radarr`, `sabnzbd`, `seerr`), wenn keine Instanz gewählt ist |
-| `refresh_seconds` | Zahl 0–600 | je Karte | Sekunden zwischen zwei Abfragen; `0` schaltet das Nachladen ab |
+| `refresh_seconds` | Zahl 0–600 | je Karte | Sekunden zwischen zwei Abfragen; `0` schaltet das Nachladen ab. In einem verborgenen Tab ruht der Takt, nach Fehlern wird die Pause länger (bis 10 Minuten). |
 | `max_items` | Zahl | je Karte | Anzahl Zeilen bzw. Einträge pro Seite |
 
 ## arrstack-downloads-card
@@ -115,6 +115,10 @@ der Grund darunter. Erledigte Einträge lassen sich ausgewählt oder gesammelt
 („Bereite importieren") übernehmen. *Löschen* entfernt den Eintrag aus der
 Warteschlange **und** die heruntergeladenen Dateien im Download-Client; vorher
 folgt eine Rückfrage.
+
+Im Takt liest die Karte nur die Warteschlange. Die Dateiprüfung im Dienst läuft
+beim ersten Anzeigen, auf *Aktualisieren*, nach einer Aktion und sobald ein neuer
+fertiger Problemeintrag auftaucht.
 
 ```yaml
 type: custom:arrstack-fix-card

@@ -1563,6 +1563,20 @@ function oeffneDialog(model) {
  * Gemeinsame Basis der vier Karten
  * ═══════════════════════════════════════════════════════════════════════════ */
 
+/** Longest pause between timer fetches after repeated errors (M13, N5.4). */
+const ARRSTACK_MAX_BACKOFF_MS = 600000;
+
+/**
+ * Reads shared by every card on the page, keyed by type and instance (M13, P5.2).
+ * An entry joins concurrent reads and serves a settled answer for half the
+ * caller's tick; write actions drop the entries of their instance.
+ */
+const ARRSTACK_READS = new Map();
+
+function arrstackForgetReads(instance) {
+  for (const key of [...ARRSTACK_READS.keys()]) if (key.endsWith(`|${instance}`)) ARRSTACK_READS.delete(key);
+}
+
 /** Was alle vier Karten teilen: Konfiguration, Laden, Fehlertexte, Takt. */
 class ArrstackCardBase extends HTMLElement {
   constructor() {
@@ -1572,8 +1586,17 @@ class ArrstackCardBase extends HTMLElement {
     this._hass = null;
     this._timer = null;
     this._loading = false;
+    this._loadSeq = 0;
+    this._failures = 0;
+    this._retryAt = 0;
+    this._missedTick = false;
     this._error = null;
     this._dialog = null;
+    this._onVisibility = () => {
+      if (document.hidden || !this._missedTick || !this._timer || this._busy) return;
+      this._missedTick = false;
+      this._load({ shared: true });
+    };
   }
 
   /** Das Wörterbuch dieser Karte; jede Unterklasse setzt es. */
@@ -1588,7 +1611,7 @@ class ArrstackCardBase extends HTMLElement {
     // Der Takt hängt an der Konfiguration — wird sie im Editor geändert,
     // muss der laufende Timer mit, sonst gilt weiter der alte Wert.
     if (this.isConnected) this._startTimer();
-    if (this._hass) this._load();
+    if (this._hass) this._load({ shared: true });
   }
 
   _defaults() {
@@ -1598,7 +1621,79 @@ class ArrstackCardBase extends HTMLElement {
   set hass(hass) {
     const first = !this._hass;
     this._hass = hass;
-    if (first && this._config) this._load();
+    if (first && this._config) this._load({ shared: true });
+  }
+
+  /**
+   * Loads the card's data. Each call starts a new generation; only the newest
+   * one may set the state, so an older timer read can never overwrite the
+   * result of a write action (M13, N4). `shared` (first display, timer,
+   * return to the tab) skips while a load runs and may join another card's
+   * read; without it (buttons, after a write) a fresh read always starts.
+   */
+  async _load({ shared = false } = {}) {
+    if (shared && this._loading) return;
+    const seq = ++this._loadSeq;
+    this._loading = true;
+    try {
+      const data = await this._fetch(shared);
+      if (seq !== this._loadSeq) return;
+      this._accept(data);
+      this._error = null;
+      this._failures = 0;
+      this._retryAt = 0;
+    } catch (error) {
+      if (seq !== this._loadSeq) return;
+      this._error = error;
+      this._failures += 1;
+      this._retryAt = Date.now() + Math.min(ARRSTACK_MAX_BACKOFF_MS, this._refreshMs() * 2 ** (this._failures - 1));
+    } finally {
+      if (seq === this._loadSeq) {
+        this._loading = false;
+        this._loaded = true;
+        this._render();
+      }
+    }
+  }
+
+  /** The card's read; `shared` as in `_load`. Cards without a read render only. */
+  async _fetch() {
+    return null;
+  }
+
+  /** Takes over the answer of the newest read. */
+  _accept(data) {
+    this._data = data;
+  }
+
+  /** Makes every running read stale and drops shared reads of this instance; call before a write. */
+  _invalidateLoads() {
+    this._loadSeq += 1;
+    arrstackForgetReads(this._instanceKey());
+  }
+
+  _instanceKey(route = null) {
+    const instance = route || this._config || {};
+    return instance.entry_id ? `entry:${instance.entry_id}` : `service:${instance.service || ""}`;
+  }
+
+  _refreshMs() {
+    const seconds = Number(this._config && this._config.refresh_seconds);
+    return seconds > 0 ? seconds * 1000 : 0;
+  }
+
+  /** A list read through ARRSTACK_READS; `shared` false always starts a new request. */
+  _read(type, { shared = false } = {}) {
+    const key = `${type}|${this._instanceKey()}`;
+    const hit = ARRSTACK_READS.get(key);
+    if (shared && hit && (hit.pending || Date.now() - hit.at <= this._refreshMs() / 2)) return hit.promise;
+    const entry = { pending: true, at: Date.now(), promise: null };
+    entry.promise = Promise.resolve(this._call(type)).then(
+      (value) => { entry.pending = false; entry.at = Date.now(); return value; },
+      (error) => { if (ARRSTACK_READS.get(key) === entry) ARRSTACK_READS.delete(key); throw error; }
+    );
+    ARRSTACK_READS.set(key, entry);
+    return entry.promise;
   }
 
   /** `de` oder `en` — die Sprache, die der Nutzer in HA eingestellt hat. */
@@ -1620,21 +1715,30 @@ class ArrstackCardBase extends HTMLElement {
 
   connectedCallback() {
     this._startTimer();
-    if (this._config && this._hass && !this._loaded) this._load();
+    document.removeEventListener?.("visibilitychange", this._onVisibility);
+    document.addEventListener?.("visibilitychange", this._onVisibility);
+    if (this._config && this._hass && !this._loaded) this._load({ shared: true });
   }
 
   disconnectedCallback() {
     this._stopTimer();
+    document.removeEventListener?.("visibilitychange", this._onVisibility);
     this._schliesseDialog();
   }
 
   _startTimer() {
     this._stopTimer();
-    const seconds = Number(this._config && this._config.refresh_seconds);
-    if (!seconds || seconds <= 0) return;
-    this._timer = setInterval(() => {
-      if (this._hass && this._config) this._load();
-    }, seconds * 1000);
+    const ms = this._refreshMs();
+    if (!ms) return;
+    this._timer = setInterval(() => this._tick(), ms);
+  }
+
+  /** One timer step: nothing in a hidden tab, during a write or inside the error pause (M13). */
+  _tick() {
+    if (!this._hass || !this._config || this._busy) return;
+    if (document.hidden) { this._missedTick = true; return; }
+    if (Date.now() < this._retryAt) return;
+    this._load({ shared: true });
   }
 
   _stopTimer() {
@@ -2090,6 +2194,7 @@ class ArrstackImportCardBase extends ArrstackCardBase {
   async _mutate(type,params={},dialog=null) {
     if (this._busy) return;
     this._busy = type; this._message = null; this._operationError = null;
+    this._invalidateLoads();
     this._render();
     if (dialog) { if (this._open) this._open.fehler=null; dialog.model = {...dialog._model,aktionen:this._dialogAktionen()}; }
     let closeAfterRefresh = false;
@@ -2282,20 +2387,8 @@ class ArrstackDownloadsCard extends ArrstackImportCardBase {
     return { max_items: 10, show_posters: true, show_unknown: true };
   }
 
-  async _load() {
-    if (this._loading) return;
-    this._loading = true;
-    try {
-      const result = await this._call("arrstack/queue");
-      this._data = result;
-      this._error = null;
-    } catch (error) {
-      this._error = error;
-    } finally {
-      this._loading = false;
-      this._loaded = true;
-      this._render();
-    }
+  _fetch(shared) {
+    return this._read("arrstack/queue", { shared });
   }
 
   _render() {
@@ -2416,29 +2509,22 @@ class ArrstackRecentCard extends ArrstackCardBase {
     return { max_items: 8, refresh_seconds: 120 };
   }
 
-  async _load() {
-    if (this._loading) return;
-    this._loading = true;
-    try {
-      this._data = await this._call("arrstack/recent");
-      this._error = null;
-    } catch (error) {
-      this._error = error;
-    } finally {
-      this._loading = false;
-      this._loaded = true;
-      this._render();
-    }
+  _fetch(shared) {
+    return this._read("arrstack/recent", { shared });
   }
 
   _render() {
     if (!this._config) return;
-    // sink-ok: constant styles plus _head()/_body() markup, which escape every text field (tests/xss.test.js)
-    this.shadowRoot.innerHTML = `<style>${ARRSTACK_STYLES}</style>
+    const markup = `<style>${ARRSTACK_STYLES}</style>
       <ha-card>
         ${this._head("download")}
         ${this._body()}
       </ha-card>`;
+    // Same markup as last time: keep the DOM, posters and focus (M13, P5.3).
+    if (markup === this._markup) return;
+    this._markup = markup;
+    // sink-ok: constant styles plus _head()/_body() markup, which escape every text field (tests/xss.test.js)
+    this.shadowRoot.innerHTML = markup;
     bindImageFallbacks(this.shadowRoot);
     this.shadowRoot.querySelector(".act-retry")?.addEventListener("click",()=>this._load());
   }
@@ -2504,16 +2590,48 @@ class ArrstackFixCard extends ArrstackImportCardBase {
     this._page = 0;
   }
 
-  async _load() {
-    if (this._loading) return;
-    this._loading = true;
-    try {
-      this._data = await this._call("arrstack/refresh_import_queue");
-      this._error = null;
-      const readyIds = new Set((this._data.items || []).filter(item => this._ready(item)).map(item => this._id(item)));
-      this._selected = new Set([...this._selected].filter(id => readyIds.has(id)));
-    } catch (error) { this._error = error; }
-    finally { this._loading = false; this._loaded = true; this._render(); }
+  /**
+   * The import scan (`refresh_import_queue`) asks the *arr service for import
+   * candidates of every problem entry, a file scan each (N5). It runs on first
+   * display, on the refresh/retry buttons, after a write and for a new finished
+   * problem entry; timer ticks only read the cheap queue and keep the last
+   * inspection of each entry.
+   */
+  async _fetch(shared) {
+    if (!shared || !this._inspected) return { scan: await this._read("arrstack/refresh_import_queue", { shared }) };
+    const queue = await this._read("arrstack/queue", { shared });
+    if ((queue.items || []).some(item => this._newProblem(item))) return { scan: await this._read("arrstack/refresh_import_queue", { shared }) };
+    return { queue };
+  }
+
+  _accept({ scan, queue }) {
+    if (scan) {
+      this._inspected = new Map((scan.items || []).map(item => [this._id(item), item]));
+      this._data = scan;
+    } else {
+      this._data = { ...this._data, service: queue.service || this._data?.service, brand: queue.brand, items: (queue.items || []).map(item => this._fromQueue(item)) };
+    }
+    const readyIds = new Set((this._data.items || []).filter(item => this._ready(item)).map(item => this._id(item)));
+    this._selected = new Set([...this._selected].filter(id => readyIds.has(id)));
+  }
+
+  _queueProblem(item) {
+    return String(item.status).toLowerCase() === "completed" && item.sizeleft != null && Number(item.sizeleft) === 0 && item.is_problem === true;
+  }
+
+  /** A finished problem entry the last scan has not inspected. */
+  _newProblem(item) {
+    if (!this._queueProblem(item)) return false;
+    const known = this._inspected.get(this._id(item));
+    return !known || known.import_state === "not_applicable";
+  }
+
+  /** A queue entry in the shape of the scan: inspection kept for problems, `not_applicable` otherwise (as the integration does). */
+  _fromQueue(item) {
+    const id = this._id(item), complete = String(item.status).toLowerCase() === "completed" && item.sizeleft != null && Number(item.sizeleft) === 0;
+    const known = this._inspected.get(id);
+    if (known && this._queueProblem(item)) return { ...known, ...item, queue_item_id: id, download_complete: true };
+    return { ...item, queue_item_id: id, download_complete: complete, import_state: "not_applicable", candidate_count: null, candidates: [], last_error: null };
   }
 
   _render() {
@@ -2619,7 +2737,7 @@ class ArrstackFixCard extends ArrstackImportCardBase {
   }
   async _delete(itemId) {
     if (this._busy) return;
-    this._busy = itemId; this._render();
+    this._busy = itemId; this._invalidateLoads(); this._render();
     try { await this._call("arrstack/queue_remove",{item_id:itemId,remove_from_client:true,blocklist:false}); this._message=this._t().geloescht; }
     catch(error) { this._operationError=error; }
     finally { this._busy=null; await this._load(); }
