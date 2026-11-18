@@ -125,3 +125,27 @@ test("M13: the recent card does not rebuild its DOM for unchanged data", async (
   assert.equal(writes, 1, "changed data rebuilds once");
   card.disconnectedCallback();
 });
+
+test("M13: the fix card sees a new problem beyond the first queue page (more than 200 entries)", async () => {
+  const { clock, ha, server, mount } = setup();
+  // `arrstack/queue` answers from the coordinator: the first page only (200), `total` counts all.
+  // Only `refresh_import_queue` reads every page, so the tick must scan while the queue is cut off.
+  server.queue = Array.from({ length: 250 }, (_, i) => row(1000 + i, { progress: 40, sizeleft: 600, status: "downloading", is_problem: false }));
+  ha.respond("arrstack/queue", () => ({ service: "sonarr", brand: "sonarr", items: server.queue.slice(0, 200).map((item) => ({ ...item })), total: server.queue.length }));
+  const card = mount("fix", { refresh_seconds: 60 });
+  await clock.flush();
+  assert.equal(ha.count("arrstack/refresh_import_queue"), 1, "first display");
+  assert.equal(card._data.items.length, 250, "the scan reads every page");
+  server.queue[230] = row(1230); // finishes with an import problem, on page 2
+  await clock.advance(60_000);
+  assert.equal(ha.count("arrstack/refresh_import_queue"), 2, "a cut-off queue is scanned on the tick");
+  const found = card._data.items.find((item) => item.queue_item_id === 1230);
+  assert.equal(found && found.import_state, "no_match", "the problem on page 2 is inspected");
+  assert.equal(card._data.items.length, 250, "entries beyond page 1 stay on the card");
+  server.queue = server.queue.slice(0, 150); // back under one page: cheap ticks again
+  await clock.advance(60_000);
+  const scans = ha.count("arrstack/refresh_import_queue");
+  await clock.advance(5 * 60_000);
+  assert.equal(ha.count("arrstack/refresh_import_queue"), scans, "a complete first page needs no scan");
+  card.disconnectedCallback();
+});

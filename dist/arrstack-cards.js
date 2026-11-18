@@ -2632,12 +2632,15 @@ class ArrstackFixCard extends ArrstackImportCardBase {
    * candidates of every problem entry, a file scan each (N5). It runs on first
    * display, on the refresh/retry buttons, after a write and for a new finished
    * problem entry; timer ticks only read the cheap queue and keep the last
-   * inspection of each entry.
+   * inspection of each entry. `arrstack/queue` has no page parameter and holds
+   * the first page only (200 entries, `total` counts all); while it is cut off,
+   * the tick scans, since only the scan reads every page.
    */
   async _fetch(shared) {
     if (!shared || !this._inspected) return { scan: await this._read("arrstack/refresh_import_queue", { shared }) };
     const queue = await this._read("arrstack/queue", { shared });
-    if ((queue.items || []).some(item => this._newProblem(item))) return { scan: await this._read("arrstack/refresh_import_queue", { shared }) };
+    const items = queue.items || [];
+    if (Number(queue.total) > items.length || items.some(item => this._newProblem(item))) return { scan: await this._read("arrstack/refresh_import_queue", { shared }) };
     return { queue };
   }
 
