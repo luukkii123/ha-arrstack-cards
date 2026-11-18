@@ -1,3 +1,4 @@
+const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
@@ -46,21 +47,46 @@ const context = {
 };
 vm.runInNewContext(fs.readFileSync(path.join(__dirname, "../dist/arrstack-cards.js"), "utf8"), context);
 
-async function run() {
+
+const flush = () => new Promise((resolve) => setImmediate(resolve));
+const EDITOR_TAGS = [
+  "arrstack-downloads-card-editor",
+  "arrstack-recent-card-editor",
+  "arrstack-fix-card-editor",
+  "arrstack-seer-card-editor",
+];
+
+async function columnEditorSetup() {
   const columnEditor = new (elements.get('arrstack-downloads-card-editor'))();
   const initialColumns=Object.freeze(['title','status','title','unknown']);
   columnEditor.setConfig(Object.freeze({type:'custom:arrstack-downloads-card',columns:initialColumns,show_posters:true}));
   columnEditor.hass={locale:{language:'de'},callWS:async()=>({instances:[]})};
-  await new Promise(resolve=>setImmediate(resolve));
+  await flush();
+  return { columnEditor, initialColumns };
+}
+
+test("downloads editor normalises columns without mutating the caller's input", async () => {
+  const { columnEditor, initialColumns } = await columnEditorSetup();
   assert.deepEqual(Array.from(columnEditor._config.columns),['title','status'],'Editor normalisiert ohne fremde Eingabe zu mutieren');
   assert.deepEqual(Array.from(initialColumns),['title','status','title','unknown']);
+});
+
+test("downloads editor gives a legacy config consistent visible defaults", () => {
   const legacyEditor=new (elements.get('arrstack-downloads-card-editor'))();
   legacyEditor.setConfig({type:'custom:arrstack-downloads-card',show_posters:false});
   assert.equal(legacyEditor._config.show_posters,false,'bestehende explizite Posteroption erhalten');
   assert.equal(legacyEditor._config.show_unknown,true,'unbekannte Titel bleiben sichtbar');
   assert.deepEqual(Array.from(legacyEditor._config.columns),['title','status','episode','timeleft','progress'],'legacy Config bekommt konsistente sichtbare Defaults');
+});
+
+test("downloads editor offers visible columns as ha-form multi-select", async () => {
+  const { columnEditor } = await columnEditorSetup();
   const selectedField=columnEditor.children[0].schema.find(field=>field.name==='columns');
   assert(selectedField.selector.select.multiple,'sichtbare Spalten sind ha-form Mehrfachauswahl');
+});
+
+test("downloads editor sorts columns by move action and keeps the form on the order echo", async () => {
+  const { columnEditor } = await columnEditorSetup();
   const columnChanges=[];
   columnEditor.addEventListener('config-changed',event=>columnChanges.push(JSON.parse(JSON.stringify(event.detail.config))));
   columnEditor._moveColumn('status',-1);
@@ -72,42 +98,74 @@ async function run() {
   assert.equal(columnChanges.length,1,'Grenze führt keine leere Änderung aus');
   columnEditor.children[0].dispatchEvent({type:'value-changed',detail:{value:{columns:['status','episode']}},stopPropagation(){}});
   assert.deepEqual(Array.from(columnEditor._config.columns),['status','episode'],'sichtbare Spalten aktualisieren Reihenfolge');
+});
 
-  for (const tag of [
-    "arrstack-downloads-card-editor",
-    "arrstack-recent-card-editor",
-    "arrstack-fix-card-editor",
-    "arrstack-seer-card-editor",
-  ]) {
-    const editor = new (elements.get(tag))();
-    const entityIds = Object.freeze(["light.example"]);
-    const target = Object.freeze({ entity_id: entityIds });
-    const tapAction = Object.freeze({ action: "perform-action", target });
-    const original = Object.freeze({
-      type: `custom:${tag.slice(0, -7)}`, title: "Start", refresh_seconds: 15,
-      tap_action: tapAction,
-      ...(tag.includes("downloads") ? {columns:["title","status","episode","timeleft","progress"],show_posters:true,show_unknown:true,max_items:10} : {}),
-    });
-    const emitted = [];
-    editor.addEventListener("config-changed", (event) => {
-      emitted.push(JSON.parse(JSON.stringify(event.detail.config)));
-      event.detail.config.tap_action.target.entity_id[0] = "light.changed_by_consumer";
-      assert.equal(event.detail.config.tap_action.target.entity_id[0], "light.changed_by_consumer");
-    });
-    editor.setConfig(original);
-    editor.hass = {
-      locale: { language: "de" },
-      callWS: async () => ({ instances: [
-        { entry_id: "sonarr-1", service: "sonarr", title: "Sonarr Eins" },
-        { entry_id: "seerr-1", service: "seerr", title: "Seerr Eins" },
-      ] }),
-    };
-    await new Promise((resolve) => setImmediate(resolve));
-    const form = editor.children[0];
+test("downloads editor moves a column down and ignores unknown or out-of-range moves", async () => {
+  const { columnEditor } = await columnEditorSetup();
+  const columnChanges=[];
+  columnEditor.addEventListener('config-changed',event=>columnChanges.push(JSON.parse(JSON.stringify(event.detail.config))));
+  columnEditor._moveColumn('title',1);
+  assert.deepEqual(Array.from(columnEditor._config.columns),['status','title']);
+  columnEditor._moveColumn('title',1);
+  columnEditor._moveColumn('episode',-1);
+  assert.equal(columnChanges.length,1,'only the real move emits a change');
+});
+
+function originalConfig(tag) {
+  const entityIds = Object.freeze(["light.example"]);
+  const target = Object.freeze({ entity_id: entityIds });
+  const tapAction = Object.freeze({ action: "perform-action", target });
+  return Object.freeze({
+    type: `custom:${tag.slice(0, -7)}`, title: "Start", refresh_seconds: 15,
+    tap_action: tapAction,
+    ...(tag.includes("downloads") ? {columns:["title","status","episode","timeleft","progress"],show_posters:true,show_unknown:true,max_items:10} : {}),
+  });
+}
+
+async function mainEditorSetup(tag) {
+  const editor = new (elements.get(tag))();
+  const original = originalConfig(tag);
+  const emitted = [];
+  editor.addEventListener("config-changed", (event) => {
+    emitted.push(JSON.parse(JSON.stringify(event.detail.config)));
+    event.detail.config.tap_action.target.entity_id[0] = "light.changed_by_consumer";
+    assert.equal(event.detail.config.tap_action.target.entity_id[0], "light.changed_by_consumer");
+  });
+  editor.setConfig(original);
+  editor.hass = {
+    locale: { language: "de" },
+    callWS: async () => ({ instances: [
+      { entry_id: "sonarr-1", service: "sonarr", title: "Sonarr Eins" },
+      { entry_id: "seerr-1", service: "seerr", title: "Seerr Eins" },
+    ] }),
+  };
+  await flush();
+  return { editor, original, emitted, form: editor.children[0] };
+}
+
+async function quietEditorSetup(tag) {
+  const editor = new (elements.get(tag))();
+  const emitted = [];
+  editor.addEventListener("config-changed", (event) =>
+    emitted.push(JSON.parse(JSON.stringify(event.detail.config))));
+  editor.setConfig(originalConfig(tag));
+  editor.hass = {
+    locale: { language: "de" }, callWS: async () => ({ instances: [] }),
+  };
+  await flush();
+  return { editor, emitted, form: editor.children[0] };
+}
+
+for (const tag of EDITOR_TAGS) {
+  test(`${tag}: instance picker lists only matching services, labels and helpers are sentences`, async () => {
+    const { form } = await mainEditorSetup(tag);
     assert.equal(form.schema.find((field) => field.name === "entry_id").selector.select.options.length, 1);
     assert.equal(form.computeLabel(form.schema[0]) !== form.schema[0].name, true);
     assert.match(form.computeHelper(form.schema[0]), /[.!?]$/);
+  });
 
+  test(`${tag}: form owns its data and same config or hass does not reset input`, async () => {
+    const { editor, original, form } = await mainEditorSetup(tag);
     const writes = form.dataWrites;
     const schemaWrites = form.schemaWrites;
     form.currentData.tap_action.target.entity_id[0] = "light.changed_by_form";
@@ -117,7 +175,11 @@ async function run() {
     assert.equal(form.dataWrites, writes, `${tag}: gleiche Config und hass dürfen Eingabe nicht zurücksetzen`);
     assert.equal(form.schemaWrites, schemaWrites + (tag.includes("downloads") ? 1 : 0), `${tag}: nur neue Spaltenlabels brauchen Schema bei Sprachwechsel`);
     assert.notEqual(form.computeLabel(form.schema[0]), "Überschrift");
+  });
 
+  test(`${tag}: value changes emit cumulative copies and echoes keep the active form`, async () => {
+    const { editor, original, emitted, form } = await mainEditorSetup(tag);
+    const writes = form.dataWrites;
     form.dispatchEvent({ type: "value-changed", detail: { value: { title: "Neu" } }, stopPropagation() {} });
     assert.equal(editor._config.tap_action.target.entity_id[0], "light.example", `${tag}: Ereignisempfänger verändert keinen Editorstand`);
     form.dispatchEvent({ type: "value-changed", detail: { value: { title: "Neu B", max_items: 4 } }, stopPropagation() {} });
@@ -138,17 +200,10 @@ async function run() {
     editor.setConfig(JSON.parse(JSON.stringify(emitted[0])));
     assert.equal(editor._config.title, "Neu", `${tag}: bewusste YAML-Rückkehr zu einem früheren Wert bleibt möglich`);
     assert.equal(form.dataWrites, writes + 2, `${tag}: YAML-Rückkehr aktualisiert das Formular`);
+  });
 
-    const orderedEditor = new (elements.get(tag))();
-    const orderedEmitted = [];
-    orderedEditor.addEventListener("config-changed", (event) =>
-      orderedEmitted.push(JSON.parse(JSON.stringify(event.detail.config))));
-    orderedEditor.setConfig(original);
-    orderedEditor.hass = {
-      locale: { language: "de" }, callWS: async () => ({ instances: [] }),
-    };
-    await new Promise((resolve) => setImmediate(resolve));
-    const orderedForm = orderedEditor.children[0];
+  test(`${tag}: early echoes do not roll back a newer value`, async () => {
+    const { editor: orderedEditor, emitted: orderedEmitted, form: orderedForm } = await quietEditorSetup(tag);
     orderedForm.dispatchEvent({ type: "value-changed", detail: { value: { title: "A" } }, stopPropagation() {} });
     orderedForm.dispatchEvent({ type: "value-changed", detail: { value: { title: "B" } }, stopPropagation() {} });
     const beforeEchoWrites = orderedForm.dataWrites;
@@ -163,17 +218,10 @@ async function run() {
     orderedEditor.setConfig(JSON.parse(JSON.stringify(orderedEmitted[0])));
     assert.equal(orderedEditor._config.title, "A", `${tag}: bestätigtes A darf später als YAML-Wert zurückkehren`);
     assert.equal(orderedForm.dataWrites, orderedWrites + 1, `${tag}: YAML-Rückkehr nach regulären Echos erreicht das Formular`);
+  });
 
-    const repeatedEditor = new (elements.get(tag))();
-    const repeatedEmitted = [];
-    repeatedEditor.addEventListener("config-changed", (event) =>
-      repeatedEmitted.push(JSON.parse(JSON.stringify(event.detail.config))));
-    repeatedEditor.setConfig(original);
-    repeatedEditor.hass = {
-      locale: { language: "de" }, callWS: async () => ({ instances: [] }),
-    };
-    await new Promise((resolve) => setImmediate(resolve));
-    const repeatedForm = repeatedEditor.children[0];
+  test(`${tag}: repeated identical values and their echoes keep the form`, async () => {
+    const { editor: repeatedEditor, emitted: repeatedEmitted, form: repeatedForm } = await quietEditorSetup(tag);
     for (const title of ["A", "B", "A", "C"]) {
       repeatedForm.dispatchEvent({ type: "value-changed", detail: { value: { title } }, stopPropagation() {} });
     }
@@ -185,16 +233,21 @@ async function run() {
     repeatedEditor.setConfig(JSON.parse(JSON.stringify(repeatedEmitted[0])));
     assert.equal(repeatedEditor._config.title, "A", `${tag}: wiederholter, bereits bestätigter Wert bleibt extern editierbar`);
     assert.equal(repeatedForm.dataWrites, repeatedWrites + 1, `${tag}: externe Rückkehr zu A erreicht das Formular`);
+  });
 
+  test(`${tag}: rejected callWS for instances is retried on the next hass update`, async () => {
     const retryEditor = new (elements.get(tag))();
-    retryEditor.setConfig(original);
+    retryEditor.setConfig(originalConfig(tag));
     let calls = 0;
     retryEditor.hass = {
       locale: { language: "de" },
       callWS: async () => { calls++; throw new Error("temporär nicht erreichbar"); },
     };
-    await new Promise((resolve) => setImmediate(resolve));
+    await flush();
     assert.equal(calls, 1, `${tag}: erster Instanzabruf lief`);
+    assert(retryEditor.children[0], `${tag}: form is still rendered after a rejected callWS`);
+    assert.equal(retryEditor.children[0].schema.find((field) => field.name === "entry_id")
+      .selector.select.options.length, 0, `${tag}: no stale options after a rejected callWS`);
     retryEditor.hass = {
       locale: { language: "de" },
       callWS: async () => {
@@ -203,11 +256,14 @@ async function run() {
           service: tag.includes("seer") ? "seerr" : "sonarr", title: "Wieder da" }] };
       },
     };
-    await new Promise((resolve) => setImmediate(resolve));
+    await flush();
     assert.equal(calls, 2, `${tag}: hass-Update wiederholt fehlgeschlagenen Instanzabruf`);
     assert.equal(retryEditor.children[0].schema.find((field) => field.name === "entry_id")
       .selector.select.options.length, 1, `${tag}: wiederhergestellte Option erscheint`);
+  });
 
+  test(`${tag}: keydown and keyup stay inside the editor without preventing defaults`, async () => {
+    const { editor } = await mainEditorSetup(tag);
     for (const type of ["keydown", "keyup"]) {
       let stopped = 0;
       let prevented = 0;
@@ -215,7 +271,5 @@ async function run() {
       assert.equal(stopped, 1, `${tag}: ${type} bleibt im Editor`);
       assert.equal(prevented, 0, `${tag}: ${type} behält die Standardaktion`);
     }
-  }
+  });
 }
-
-run().catch((error) => { console.error(error); process.exitCode = 1; });
