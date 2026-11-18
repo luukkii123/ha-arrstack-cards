@@ -227,3 +227,22 @@ test('seer_status: labels follow the HA language', () => {
  assert.equal(badge(seer,'partially_available'),'partly available');
  assert.equal(badge(seer,'surprise'),'not requested');
 });
+
+// M19 rest (#1302): status values come from Seerr and the *arr queue; property names of
+// Object.prototype must not read as labels ("function Object() …", "[object Object]").
+const PROTO_KEYS=['constructor','__proto__','toString','hasOwnProperty','valueOf'];
+
+test('seer_status: Object.prototype names fall back to "not requested"', () => {
+ const seer=makeSeer();const fallback=seer._t().seer_status.unknown;
+ for(const status of PROTO_KEYS) assert.equal(badge(seer,status),fallback,status);
+});
+
+test('queue status: Object.prototype names in status, tracked_state and import_state show the raw value', () => {
+ const downloads=makeDownloads();const fix=makeFix();const t=downloads._t();
+ for(const value of PROTO_KEYS) {
+   const status=downloads._row({id:1,title:'X',status:value,tracked_state:value,progress:10}).match(/<span class="status-badge[^"]*">([^<]*)<\/span>/)[1];
+   assert.equal(status,value,`downloads ${value}`);
+   assert.equal(fix._stateLabel({status:value,tracked_state:value,import_state:value}),value,`fix ${value}`);
+ }
+ assert.equal(downloads._row({id:1,title:'X',status:'downloading',progress:10}).includes(t.zustaende.downloading),true,'known status keeps its label');
+});

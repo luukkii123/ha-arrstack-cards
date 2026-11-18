@@ -1868,10 +1868,15 @@ class ArrstackCardBase extends HTMLElement {
  * abweicht — „Import blockiert" ist die Auskunft, die zählt, nicht „fertig".
  */
 function queueStatusText(item, t) {
-  const tracked = t.verfolgt[item.tracked_state];
+  const tracked = ownLabel(t.verfolgt, item.tracked_state);
   if (tracked) return tracked;
   const key = String(item.status || "").toLowerCase();
-  return t.zustaende[key] || item.status || "";
+  return ownLabel(t.zustaende, key) || item.status || "";
+}
+
+/** A label table entry for a value from outside; names of Object.prototype are no entry (M19). */
+function ownLabel(table, key) {
+  return table && Object.hasOwn(table, key) ? table[key] : undefined;
 }
 
 /** Gemeinsame Statussemantik 0.1.0; der übersetzte Text bleibt fachlich. */
@@ -2164,7 +2169,7 @@ class ArrstackImportCardBase extends ArrstackCardBase {
 
   _stateLabel(item) {
     const t=this._t();
-    return {ready:t.eine_datei,no_match:t.keine_datei,selection_required:t.auswahl_noetig,error:t.import_status}[item.import_state] || queueStatusText(item,t);
+    return ownLabel({ready:t.eine_datei,no_match:t.keine_datei,selection_required:t.auswahl_noetig,error:t.import_status},item.import_state) || queueStatusText(item,t);
   }
 
   _id(item) { return Number(item.queue_item_id ?? item.id); }
@@ -3085,7 +3090,7 @@ class ArrstackSeerCard extends ArrstackCardBase {
 
 /** Statuszahlen von Seerr in Worte (Enum aus Jellyseerr/Seerr). */
 function statusLabel(status, t) {
-  return t.seer_status[status] || t.seer_status.unknown;
+  return ownLabel(t.seer_status, status) || t.seer_status.unknown;
 }
 
 /* ── Anmeldung ──────────────────────────────────────────────────────────── */
