@@ -61,6 +61,12 @@ Gelten für alle vier Karten.
 | `refresh_seconds` | Zahl 0–600 | je Karte | Sekunden zwischen zwei Abfragen; `0` schaltet das Nachladen ab. In einem verborgenen Tab ruht der Takt, nach Fehlern wird die Pause länger (bis 10 Minuten). |
 | `max_items` | Zahl | je Karte | Anzahl Zeilen bzw. Einträge pro Seite |
 
+Antwortet die Integration nicht, meldet die Karte nach 15 Sekunden einen Fehler
+mit „Erneut versuchen“. Dateiprüfung, Import, Löschen und Anfragen warten
+30 Sekunden; eine Aktion ohne Antwort wird nicht wiederholt, Downloads- und
+Fix-Karte laden danach die Warteschlange neu. Ist der letzte erfolgreiche Abruf älter als zwei Takte, steht
+„Stand vor N Min.“ im Kopf.
+
 ## arrstack-downloads-card
 
 Dienste: Sonarr, Radarr, SABnzbd. Vorgabetitel: „Downloads".

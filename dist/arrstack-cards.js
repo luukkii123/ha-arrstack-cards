@@ -399,6 +399,9 @@ const TEXTE_ARRSTACK_BASIS = {
     fehler_nicht_unterstuetzt: "Dieser Dienst kann das nicht.",
     fehler_rechte: "Dafür fehlen die Rechte — Administrator nötig.",
     fehler_allgemein: "Daten konnten nicht geladen werden.",
+    fehler_zeit: "Keine Antwort in der Zeitgrenze.",
+    fehler_zeit_schreiben: "Keine Antwort in der Zeitgrenze. Ob die Aktion ausgeführt wurde, ist offen – erst den aktuellen Stand prüfen, dann erneut versuchen.",
+    stand_alt: "Stand vor {n} Min.",
     einheiten: ["B", "KB", "MB", "GB", "TB"],
     zahlformat: "de-DE",
     zeit_jetzt: "gerade eben",
@@ -460,6 +463,9 @@ const TEXTE_ARRSTACK_BASIS = {
     fehler_nicht_unterstuetzt: "This service cannot do that.",
     fehler_rechte: "Not allowed — this needs an administrator.",
     fehler_allgemein: "Could not load the data.",
+    fehler_zeit: "No answer within the time limit.",
+    fehler_zeit_schreiben: "No answer within the time limit. Whether the action ran is unknown – check the current state before trying again.",
+    stand_alt: "As of {n} min ago",
     einheiten: ["B", "KB", "MB", "GB", "TB"],
     zahlformat: "en-US",
     zeit_jetzt: "just now",
@@ -1566,6 +1572,23 @@ function oeffneDialog(model) {
 /** Longest pause between timer fetches after repeated errors (M13, N5.4). */
 const ARRSTACK_MAX_BACKOFF_MS = 600000;
 
+/** Time limits for callWS (M34, N9): lists 15 s; import scans and writes 30 s. */
+const ARRSTACK_LIST_TIMEOUT_MS = 15000;
+const ARRSTACK_SLOW_TIMEOUT_MS = 30000;
+/** Writes are never repeated after a time-out; the outcome is unknown, the card reads anew. */
+const ARRSTACK_WRITES = new Set(["arrstack/import_item", "arrstack/import_ready", "arrstack/import_selected", "arrstack/queue_remove", "arrstack/request"]);
+/** Reads that ask the *arr service for import candidates, one file scan per entry. */
+const ARRSTACK_SCANS = new Set(["arrstack/refresh_import_queue", "arrstack/inspect_import"]);
+
+/** Rejects with an error carrying `code` when `promise` has not settled after `ms`. */
+function withTimeout(promise, ms, code = "timeout") {
+  let timer;
+  const limit = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(Object.assign(new Error(`${code}: no answer after ${ms} ms`), { code })), ms);
+  });
+  return Promise.race([promise, limit]).finally(() => clearTimeout(timer));
+}
+
 /**
  * Reads shared by every card on the page, keyed by type and instance (M13, P5.2).
  * An entry joins concurrent reads and serves a settled answer for half the
@@ -1640,6 +1663,7 @@ class ArrstackCardBase extends HTMLElement {
       if (seq !== this._loadSeq) return;
       this._accept(data);
       this._error = null;
+      this._lastOk = Date.now();
       this._failures = 0;
       this._retryAt = 0;
     } catch (error) {
@@ -1775,7 +1799,9 @@ class ArrstackCardBase extends HTMLElement {
     const instance = route || this._config;
     if (instance.entry_id) message.entry_id = instance.entry_id;
     else if (instance.service) message.service = instance.service;
-    return this._hass.callWS(message);
+    const write = ARRSTACK_WRITES.has(type);
+    const ms = write || ARRSTACK_SCANS.has(type) ? ARRSTACK_SLOW_TIMEOUT_MS : ARRSTACK_LIST_TIMEOUT_MS;
+    return withTimeout(this._hass.callWS(message), ms, write ? "write_timeout" : "timeout");
   }
 
   /** Fehlercodes der Integration in Sätze, die weiterhelfen. */
@@ -1786,12 +1812,14 @@ class ArrstackCardBase extends HTMLElement {
     if (code === "ambiguous_instance") return t.fehler_mehrdeutig;
     if (code === "unsupported_service") return t.fehler_nicht_unterstuetzt;
     if (code === "unauthorized") return t.fehler_rechte;
+    if (code === "timeout") return t.fehler_zeit;
+    if (code === "write_timeout") return t.fehler_zeit_schreiben;
     return (error && error.message) || t.fehler_allgemein;
   }
 
   _errorMarkup(error, heading, retry = true) {
     const t = this._t();
-    const known = ["not_found","ambiguous_instance","unsupported_service","unauthorized"].includes(error?.code);
+    const known = ["not_found","ambiguous_instance","unsupported_service","unauthorized","timeout","write_timeout"].includes(error?.code);
     return `<div class="notice problem" role="alert"><div>${escapeHtml(heading || t.fehler_allgemein)}</div>
       <div>${escapeHtml(known ? this._errorText(error) : t.fehler_kurz)}</div>
       ${retry ? `<button class="act-retry quiet">${escapeHtml(t.erneut)}</button>` : ""}
@@ -1804,8 +1832,17 @@ class ArrstackCardBase extends HTMLElement {
       <div class="empty-text">${escapeHtml(text)}</div></div>`;
   }
 
+  /** „Stand vor N Min." once the last successful read is older than two ticks (M34, N9.2). */
+  _staleMeta() {
+    const tick = this._refreshMs();
+    if (!tick || !this._lastOk) return "";
+    const age = Date.now() - this._lastOk;
+    return age > 2 * tick ? fuelle(this._t().stand_alt, { n: Math.max(1, Math.floor(age / 60000)) }) : "";
+  }
+
   /** Kopfzeile mit Logo, Titel und optionaler Nebenauskunft. */
   _head(icon, meta = "", tone = "") {
+    meta = [meta, this._staleMeta()].filter(Boolean).join(" · ");
     const node=document.createElement('div');node.className='head';
     node.innerHTML=`<div class="head-title">
         <span class="head-media">${serviceSymbol(this._data?.brand || this._data?.service || this._config?.service, icon, 24)}</span>
