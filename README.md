@@ -147,6 +147,22 @@ title: Anfragen
 
 ![Alle Karten auf 320 px Breite im dunklen Thema](docs/preview-mobil-dunkel.png)
 
+## Datenschutz
+
+Die Karten fragen Daten nur über die Integration ab (`hass.callWS`). Zwei Arten
+von Bildern lädt der Browser aber **direkt** von fremden Servern; diese sehen
+dabei die IP-Adresse und, bei Postern, welche Titel angezeigt werden:
+
+- **Poster:** von der Adresse, die die Integration liefert. Bei Seerr ist das
+  `image.tmdb.org` (TMDB), bei Sonarr und Radarr die Bildquelle, die der Dienst
+  nennt (TMDB, Fanart.tv oder TheTVDB). Abschalten: `show_posters: false` in der
+  Downloads-Karte. Die Karten „Zuletzt hinzugefügt", „Import / Probleme" und
+  „Seer" zeigen Poster immer.
+- **Dienst-Logos:** von `brands.home-assistant.io`, derselben Quelle, aus der
+  Home Assistant selbst die Zeichen seiner Integrationen lädt.
+
+Lädt ein Bild nicht, erscheint ein eigenes Symbol.
+
 ## Theme-Variablen
 
 Es gibt keine eigenen Variablen. Die Karten übernehmen die Standardvariablen

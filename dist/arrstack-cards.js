@@ -311,7 +311,8 @@ const ARR_ICON_PATHS = {
  * `brands.home-assistant.io` ist Home Assistants eigene Sammlung — dieselbe,
  * aus der das Frontend die Zeichen aller Integrationen holt. Die Logos werden
  * deshalb **verwiesen, nicht mitgeliefert**: es sind fremde Marken.
- * Lädt das Bild nicht (kein Netz), verschwindet es rückstandslos.
+ * Lädt das Bild nicht (kein Netz), verschwindet es rückstandslos
+ * (`bindImageFallbacks`).
  */
 const BRAND_BASE = "https://brands.home-assistant.io/_/";
 
@@ -333,8 +334,25 @@ function serviceSymbol(brand, fallback = "inbox", size = 22) {
 function serviceLogo(brand, size = 22) {
   if (!brand) return "";
   return `<img class="logo" src="${BRAND_BASE}${encodeURIComponent(brand)}/icon.png"
-    alt="" loading="lazy" style="width: ${size}px; height: ${size}px"
-    onerror="this.nextElementSibling.hidden=false;this.remove()">`;
+    alt="" loading="lazy" style="width: ${size}px; height: ${size}px">`;
+}
+
+/** Image fallback without inline handlers (M47): a poster or logo that fails
+ * to load reveals the placeholder right after it and removes itself, as the
+ * former inline `onerror` did. Called after every markup insertion; each image
+ * is bound once, also when a patch keeps it. */
+const IMAGE_FALLBACK_BOUND = new WeakSet();
+function bindImageFallbacks(root) {
+  root.querySelectorAll("img.poster, img.logo").forEach((img) => {
+    if (IMAGE_FALLBACK_BOUND.has(img)) return;
+    IMAGE_FALLBACK_BOUND.add(img);
+    img.addEventListener("error", () => {
+      let fallback = img.nextSibling;
+      while (fallback && fallback.nodeType !== 1) fallback = fallback.nextSibling;
+      if (fallback) fallback.hidden = false;
+      img.remove();
+    });
+  });
 }
 
 /** Ein Symbol als SVG-Zeichenkette. */
@@ -1803,8 +1821,8 @@ function posterMarkup(url, brand = null, icon = "film") {
     return `<div class="poster poster-fallback">${symbol}</div>`;
   }
   // Bei einem fehlenden TMDB-Bild erscheint der gleiche fachliche Platzhalter.
-  return `<img class="poster" src="${escapeHtml(url)}" alt="" loading="lazy"
-    onerror="this.nextElementSibling.hidden=false;this.remove()"><div class="poster poster-fallback" hidden>${symbol}</div>`;
+  // bindImageFallbacks reveals it once the markup is in the card.
+  return `<img class="poster" src="${escapeHtml(url)}" alt="" loading="lazy"><div class="poster poster-fallback" hidden>${symbol}</div>`;
 }
 
 /* ── Editor: eine Instanz auswählen ─────────────────────────────────────── */
@@ -2157,6 +2175,7 @@ function patchQueueMarkup(root, markup) {
   const template = document.createElement("template");
   template.innerHTML = markup;
   patchQueueChildren(root, template.content);
+  bindImageFallbacks(root);
   // Moving a keyed row can blur its active descendant even though the node is
   // still connected. Restore only when focus fell back to an ancestor of this
   // card; a dialog or another control outside the card must keep its focus.
@@ -2419,6 +2438,7 @@ class ArrstackRecentCard extends ArrstackCardBase {
         ${this._head("download")}
         ${this._body()}
       </ha-card>`;
+    bindImageFallbacks(this.shadowRoot);
     this.shadowRoot.querySelector(".act-retry")?.addEventListener("click",()=>this._load());
   }
 
@@ -2687,6 +2707,7 @@ class ArrstackSeerCard extends ArrstackCardBase {
         ${this._message ? `<div class="notice">${escapeHtml(this._message)}</div>` : ""}
         ${this._body()}
       </ha-card>`;
+    bindImageFallbacks(this.shadowRoot);
     this._bind();
     if (focusSelector) setTimeout(()=>this.shadowRoot.querySelector(focusSelector)?.focus(),0);
   }
