@@ -75,6 +75,8 @@ stammt.
 
 ## Geprüft
 
+**18.11.2026 · main nach 0.6.2, Buschcheck Etappe B (#1270, kein Tag)** — 74 benannte Einzeltests statt 5, Sortierung, seer_status, abgelehntes callWS (M41); Testkit, Rennen M13 als TODO rot (M5). 76 Node-Tests (1 TODO); dist unverändert. Abschlusslauf `karten-20261118-131312-6dd1c4` grün (51/51, 1003 Node-Tests, Block `statisch` grün), `--beleg-pruefen` gleich; Bilder gegen Etappe A: 1836/1901 bytegleich, Rest Uhrzeit-/Animationsrauschen.
+
 **12.11.2026 · 0.6.2, Kartenwähler ohne Live-Vorschau (#1011, Tag `v0.6.2`)** — vier Karten: Beschreibung je ein Satz mit Verb; `getStubConfig` liest `hass` nicht (Test).
 
 1. `node --check` grün; neue Tests `tests/kartenwaehler.test.js` (preview false, ein Satz Beschreibung de/en, höchstens ein Durchlauf je Register, kein Netz) zuerst rot, danach grün.
