@@ -360,6 +360,19 @@ test("M59: the CSS has one row raster and the queue fields stop before the actio
   assert.ok(!/padding-inline-end:\s*calc\(var\(--queue-action\)/.test(OWN), "no padding trick for the action column");
 });
 
+test("M59: a compact queue row with a chip and a hint stays below 180 px (compact-contract queue-compact-row500)", () => {
+  // Measured in the final run 19.11. (queue-480-light.png): row pitch 171 px in 0.8.0, 183 px with the
+  // 28 px busch-chip. Fixed parts: padding 2×12, title 44, chip 28, progress line 15, grid gap 12, hint summary 44.
+  const fields = (OWN.match(/\.queue-table:not\(\.expanded\) \.queue-fields \{([^}]*)\}/) || [])[1] || "";
+  const gap = (fields.match(/(?:^|;)\s*gap:\s*([^;]+)/) || [])[1] || "";
+  const space = { "var(--arr-space-1)": 4, "var(--arr-space-2)": 8, "var(--arr-space-3)": 12 };
+  const rowGap = space[gap.trim().split(/\s+/)[0]];
+  assert.ok(rowGap !== undefined, `row gap is a space token: ${gap}`);
+  const height = 24 + 44 + 28 + 15 + 12 + 44 + 2 * rowGap;
+  assert.ok(height < 180, `compact row ${height} px`);
+  assert.equal(space[gap.trim().split(/\s+/)[1] || gap.trim()], 8, "column gap between cells stays 8 px");
+});
+
 test("M59: every status chip carries a symbol, the selection has a visible label", () => {
   const parts = fullMarkup();
   for (const where of ["downloads", "fix", "seer"]) {

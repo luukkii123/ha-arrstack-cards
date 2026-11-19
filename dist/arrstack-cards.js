@@ -2534,8 +2534,9 @@ const ARRSTACK_DOWNLOADS_STYLES = `
     .queue-value { white-space:normal; overflow-wrap:anywhere; }
     .queue-cell[data-column=title] .queue-value { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
     .queue-reasons { grid-column:2 / -1; }
-    /* M59: the fields stay in the content column; the action column keeps the check button alone. */
-    .queue-table:not(.expanded) .queue-fields { display:flex;flex-wrap:wrap;align-items:center;gap:var(--arr-space-2);grid-column:2;grid-row:1;min-width:0; }
+    /* M59: the fields stay in the content column; the action column keeps the check button alone.
+       Row gap 4 px: with the 28 px chip the row stays compact (< 180 px, compact-contract). */
+    .queue-table:not(.expanded) .queue-fields { display:flex;flex-wrap:wrap;align-items:center;gap:var(--arr-space-1) var(--arr-space-2);grid-column:2;grid-row:1;min-width:0; }
     .queue-table:not(.expanded) .queue-cell { display:flex;align-items:center;gap:var(--arr-space-1);flex:0 1 auto;max-width:100%; }
     .queue-table:not(.expanded) .queue-cell[data-column=title] { flex:1 1 100%;min-height:var(--queue-action); }
     .queue-table:not(.expanded) .queue-cell[data-column=progress] { flex:1 1 100%; }
