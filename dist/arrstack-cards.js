@@ -1339,10 +1339,12 @@ const ARRSTACK_COMPACT = `
  * käme mit keinem `z-index` über eine Leaflet-Karte. Das ist derselbe Weg,
  * den `ha-busch-lightcards` geht.
  *
- * Der Verlaufseintrag ist dem Dialog-Manager von Home Assistant nachgebaut
- * (`src/dialogs/make-dialog-manager.ts`, `addHistory`): beim Öffnen ein
- * `pushState`, ein `popstate`-Listener schließt, der Schließ-Knopf nimmt den
- * eigenen Eintrag mit `history.back()` wieder weg. Ohne das verlässt die
+ * Verlaufseintrag, Fokusfalle und Gerüst kommen aus Shared UI (M28), wie in
+ * den übrigen Kartenfamilien: `BuschUI.dialogHistory` legt beim Öffnen genau
+ * einen eigenen Eintrag an (dem Dialog-Manager von Home Assistant nachgebaut,
+ * `addHistory`), die Zurück-Geste schließt, Schließ-Knopf und Escape nehmen
+ * den Eintrag wieder weg, nur wenn er obenauf liegt. `BuschUI.focusTrap` hält
+ * Tab im Dialog und gibt den Fokus zurück. Ohne den Eintrag verließe die
  * Zurück-Geste am Handy das ganze Dashboard.
  * ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -1390,12 +1392,7 @@ const DIALOG_STYLES = BuschUI.cardStyles + ARRSTACK_TOKENS + ARRSTACK_EINZEILIG 
   }
   /* Schließen-X oben links (Design Gallery, Dialogs). */
   .dlg-close { flex: none; width: 44px; height: 44px; justify-content: center; padding: 0; color: var(--arr-muted); }
-  .dlg-title {
-    font-size: var(--arr-font-lg);
-    font-weight: var(--arr-weight-bold);
-    color: var(--arr-text);
-    flex: 1 1 auto;
-  }
+  /* Titeltypografie aus dem Gerüst (.busch-dialog-title). */
 
   .dlg-body {
     padding: var(--arr-space-4);
@@ -1422,6 +1419,10 @@ const DIALOG_STYLES = BuschUI.cardStyles + ARRSTACK_TOKENS + ARRSTACK_EINZEILIG 
     background: var(--card-background-color, #fff);
     flex: none;
   }
+  /* In einer Bestätigung ist die endgültige Aktion die Hauptaktion: sie bleibt
+     rechts neben Abbrechen (Regel 2, Aktionen unten rechts). Das Gerüst rückt
+     eine destruktive Nebenaktion nach links; die gibt es hier nicht (R24). */
+  .dlg-foot [data-variant=destructive] { margin-inline-end: 0; }
 
   /* Unter 450 px Breite oder 500 px Höhe: Vollbild. */
   @media (max-width: 450px), (max-height: 500px) {
@@ -1441,6 +1442,7 @@ const DIALOG_STYLES = BuschUI.cardStyles + ARRSTACK_TOKENS + ARRSTACK_EINZEILIG 
       left: var(--arr-space-2); right: var(--arr-space-2);
       top: 50%; bottom: auto; transform: translateY(-50%);
       width: auto; max-height: calc(100dvh - 4 * var(--arr-space-2));
+      min-height: 0;
       border-radius: var(--arr-radius-2);
     }
   }
@@ -1458,26 +1460,15 @@ class ArrstackDialog extends HTMLElement {
     super();
     this.attachShadow({ mode: "open" });
     this._model = null;
-    // Liegt unser eigener Verlaufseintrag noch oben?
-    this._pushed = false;
-    this._closing = false;
     this._closed = false;
+    this._history = null;
+    this._trap = null;
+    // Escape closes; Tab and Shift+Tab are BuschUI.focusTrap's.
     this._onKey = (event) => {
-      if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); this.close(); }
-      if (event.key === "Tab") {
-        const buttons = this._focusables();
-        if (!buttons.length) { event.preventDefault(); return; }
-        const index = buttons.indexOf(this.shadowRoot.activeElement);
-        if ((event.shiftKey && index <= 0) || (!event.shiftKey && index === buttons.length - 1)) {
-          event.preventDefault(); buttons[event.shiftKey ? buttons.length - 1 : 0].focus();
-        }
-      }
-    };
-    this._onPop = () => {
-      if (this._closing) { this._closing = false; this._dismiss(); return; }
-      this._pushed = false;
-      if (this._blocked()) { this._push(); this._confirmDiscard(); return; }
-      this._dismiss();
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      event.stopPropagation();
+      this.close();
     };
   }
 
@@ -1487,6 +1478,9 @@ class ArrstackDialog extends HTMLElement {
   }
 
   connectedCallback() {
+    // Before the background turns inert and before the first render: the trap
+    // remembers the opener as the focus to return to.
+    this._trap = BuschUI.focusTrap(this.shadowRoot);
     this._returnFocus = document.activeElement;
     while (this._returnFocus?.shadowRoot?.activeElement) this._returnFocus = this._returnFocus.shadowRoot.activeElement;
     const originRoot = this._returnFocus?.getRootNode();
@@ -1497,39 +1491,34 @@ class ArrstackDialog extends HTMLElement {
     this._background = [...document.body.children].filter(node => node !== this).map(node => [node, node.inert]);
     this._background.forEach(([node]) => { node.inert = true; });
     document.addEventListener("keydown", this._onKey, true);
-    window.addEventListener("popstate", this._onPop);
-    this._push();
+    this._guard();
     this._render();
   }
 
   disconnectedCallback() {
     document.removeEventListener("keydown", this._onKey, true);
+    this._history?.close();
     this._background?.forEach(([node, inert]) => { node.inert = inert; });
-    if (this._returnFocus?.isConnected) this._returnFocus.focus();
-    else if (this._returnRoot) {
+    // The opener may have been re-rendered meanwhile: then its row, else the card.
+    const back = !!this._returnFocus?.isConnected;
+    this._trap?.release({ returnFocus: back });
+    if (!back && this._returnRoot) {
       const target = this._returnRoot.querySelector(this._returnSelector) || this._returnRoot.querySelector('ha-card');
       if (target?.localName === 'ha-card') target.tabIndex = -1;
       target?.focus();
     }
-    window.removeEventListener("popstate", this._onPop);
   }
 
-  /** Ein Verlaufseintrag, die Adresse bleibt, wie sie ist. */
-  _push() {
-    try {
-      history.pushState({ arrstackDialog: true }, "");
-      this._pushed = true;
-    } catch (error) {
-      // Private Fenster und Ratenbegrenzungen lehnen das ab. Escape, Scrim
-      // und der Schließ-Knopf gehen weiter; nur die Zurück-Geste fehlt dann.
-      this._pushed = false;
-    }
-  }
-
-  /** Schließen über Knopf, Escape oder Scrim — ohne verwaisten Eintrag. */
-  _focusables() {
-    return [...this.shadowRoot.querySelectorAll('button,input,summary,[tabindex="0"]')]
-      .filter(node => !node.disabled && node.getClientRects().length);
+  /** One own history entry. The back gesture closes; a busy or changed dialog keeps itself, a new entry, and asks. */
+  _guard() {
+    this._history = BuschUI.dialogHistory({
+      name: DIALOG_TAG,
+      onClose: () => {
+        if (this._closed) return;
+        if (this._blocked()) { this._guard(); this._confirmDiscard(); return; }
+        this._dismiss();
+      },
+    });
   }
 
   _blocked() { return this._model?.busy?.() || this._model?.dirty?.(); }
@@ -1540,24 +1529,16 @@ class ArrstackDialog extends HTMLElement {
     this._render();
   }
 
+  /** Schließen über Knopf, Escape oder Aktion — ohne verwaisten Eintrag. */
   close(force = false) {
     if (!force && this._blocked()) { this._confirmDiscard(); return; }
-    if (this._pushed) {
-      this._pushed = false;
-      this._closing = true;
-      history.back();
-      // Sicherung: kommt kein popstate, darf der Dialog nicht stehen bleiben.
-      setTimeout(() => {
-        if (this.isConnected) this._dismiss();
-      }, 300);
-      return;
-    }
     this._dismiss();
   }
 
   _dismiss() {
     if (this._closed) return;
     this._closed = true;
+    this._history?.close();
     if (this._model && this._model.beimSchliessen) this._model.beimSchliessen();
     this.remove();
   }
@@ -1578,19 +1559,19 @@ class ArrstackDialog extends HTMLElement {
     ] : model.aktionen || [];
     this.shadowRoot.innerHTML = `<style>${DIALOG_STYLES}</style>
       <div class="scrim"></div>
-      <div class="sheet ${model.schmal ? "schmal" : ""} ${model.kompakt ? "kompakt" : ""}" role="dialog" aria-modal="true"
+      <div class="sheet busch-dialog ${model.schmal ? "schmal" : ""} ${model.kompakt ? "kompakt" : ""}"${model.schmal ? ' data-size="confirm"' : ""} role="dialog" aria-modal="true"
         aria-label="${escapeHtml(model.titel)}">
-        <div class="dlg-head">
-          <button class="dlg-close busch-btn" aria-label="${escapeHtml(model.schliessen)}"
+        <div class="dlg-head busch-dialog-head">
+          <button class="dlg-close busch-btn busch-dialog-close" aria-label="${escapeHtml(model.schliessen)}"
             title="${escapeHtml(model.schliessen)}">${arrIcon("close", 20)}</button>
-          <div class="dlg-title">${escapeHtml(model.titel)}</div>
+          <h2 class="dlg-title busch-dialog-title">${escapeHtml(model.titel)}</h2>
         </div>
-        <div class="dlg-body">${this._discardPrompt
+        <div class="dlg-body busch-dialog-content">${this._discardPrompt
           ? `<div class="dlg-text">${escapeHtml(model.texte.aenderungen_hinweis)}</div>`
           : model.koerper()}</div>
         ${
           aktionen.length
-            ? `<div class="dlg-foot">${aktionen
+            ? `<div class="dlg-foot busch-dialog-foot">${aktionen
                 .map(
                   (aktion) => `<button ${buttonKind(aktion.art)}
                     data-akt="${escapeHtml(aktion.id)}" ${aktion.aus ? "disabled" : ""}>
@@ -1616,7 +1597,7 @@ class ArrstackDialog extends HTMLElement {
       });
     });
     if (model.binden && !this._discardPrompt) model.binden(this.shadowRoot, this);
-    const candidates = this._focusables();
+    const candidates = this._trap ? this._trap.items() : [];
     const previous = candidates.find(node => [node.dataset.season,node.dataset.candidate,node.dataset.akt].includes(focusKey));
     (previous || candidates[0])?.focus();
   }

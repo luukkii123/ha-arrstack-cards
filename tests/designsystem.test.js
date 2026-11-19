@@ -223,3 +223,109 @@ test("M61: the family sets no own title type; the title may wrap to two lines (E
   assert.match(clamp, /overflow:\s*hidden/);
   assert.match(clamp, /overflow-wrap:\s*anywhere/);
 });
+
+/* ── M28: one dialog anatomy, history and focus logic from Shared UI ───── */
+
+/** A history stand-in: an entry stack, back() pops and fires popstate like the browser. */
+function historyStub(env) {
+  const entries = [{ state: null }];
+  const stub = {
+    pushes: [], backs: 0,
+    get state() { return entries.at(-1).state; },
+    get length() { return entries.length; },
+    pushState(state) { stub.pushes.push(state); entries.push({ state: JSON.parse(JSON.stringify(state)) }); },
+    back() { stub.backs++; if (entries.length > 1) entries.pop(); env.window.dispatchEvent(new env.Event("popstate")); },
+  };
+  env.history = stub;
+  env.window.history = stub;
+  return stub;
+}
+
+function openDialog({ dirty = false } = {}) {
+  const env = installOuterHTML(kit.createEnvironment({ language: "de-DE" }));
+  const history = historyStub(env);
+  kit.loadScript(BUNDLE, { globals: env });
+  const fix = card(env, "fix");
+  env.document.body.appendChild(fix);
+  const opener = env.document.createElement("button");
+  fix.shadowRoot.appendChild(opener);
+  opener.focus();
+  let closed = 0;
+  const dialog = fix._oeffneDialog({ titel: "Endgültig löschen", schliessen: "Schließen", schmal: true, dirty: () => dirty,
+    koerper: () => "", aktionen: [], beimSchliessen: () => { closed++; } });
+  // The test DOM does not parse the dialog markup: give it two real buttons and skip the binding render.
+  dialog._render = () => {};
+  dialog.connectedCallback();
+  const first = env.document.createElement("button"), last = env.document.createElement("button");
+  dialog.shadowRoot.append(first, last);
+  return { env, history, fix, opener, dialog, first, last, closed: () => closed };
+}
+
+test("M28: the dialog keeps no own pushState, popstate or Tab handling", () => {
+  assert.ok(!/history\.(?:pushState|back|go)\s*\(/.test(OWN), "no own history calls");
+  assert.ok(!/addEventListener\(\s*["']popstate/.test(OWN), "no own popstate listener");
+  assert.ok(!/key\s*===\s*["']Tab["']/.test(OWN), "no own Tab trap");
+  assert.match(OWN, /BuschUI\.dialogHistory\(/);
+  assert.match(OWN, /BuschUI\.focusTrap\(/);
+});
+
+test("M28: opening pushes one shared entry, the back gesture closes and focus returns", () => {
+  const { env, history, fix, opener, dialog, closed } = openDialog();
+  assert.equal(history.pushes.length, 1, "one history entry");
+  assert.ok(history.pushes[0].buschUiDialog, `shared key, never HA's dialog key: ${JSON.stringify(history.pushes[0])}`);
+  history.back();
+  assert.equal(closed(), 1, "back closes the dialog once");
+  assert.ok(!dialog.isConnected, "dialog removed");
+  dialog.disconnectedCallback();
+  assert.equal(fix.shadowRoot.activeElement, opener, "focus back at the opener");
+  assert.equal(history.backs, 1, "no extra back after a back gesture");
+  assert.equal(env.document.body.contains(dialog), false);
+});
+
+test("M28: the close button removes the own entry once, without an orphan", () => {
+  const { history, dialog, closed } = openDialog();
+  dialog.close();
+  dialog.disconnectedCallback();
+  assert.equal(closed(), 1);
+  assert.equal(history.backs, 1, "own entry on top: one back");
+  assert.equal(history.length, 1, "history as before opening");
+});
+
+test("M28: a dirty dialog survives the back gesture, asks, and keeps one entry", () => {
+  const { history, dialog, closed } = openDialog({ dirty: true });
+  history.back();
+  assert.equal(closed(), 0, "still open");
+  assert.equal(dialog._discardPrompt, true, "asks before discarding");
+  assert.equal(history.pushes.length, 2, "own entry pushed again");
+  assert.equal(history.length, 2, "exactly one own entry on the stack");
+  dialog.close(true);
+  assert.equal(history.length, 1, "discarding removes it");
+});
+
+test("M28: Tab and Shift+Tab stay inside the dialog (BuschUI.focusTrap)", () => {
+  const { env, dialog, first, last } = openDialog();
+  last.focus();
+  const tab = (shiftKey) => {
+    const event = new env.KeyboardEvent("keydown", { key: "Tab", shiftKey, bubbles: true, cancelable: true });
+    env.document.dispatchEvent(event);
+    return event;
+  };
+  assert.ok(tab(false).defaultPrevented, "Tab handled");
+  assert.equal(dialog.shadowRoot.activeElement, first, "Tab after the last control wraps to the first");
+  tab(true);
+  assert.equal(dialog.shadowRoot.activeElement, last, "Shift+Tab on the first wraps to the last");
+  dialog.close();
+});
+
+test("M28: the dialog uses the shared anatomy: X left in the head, title, content, foot", () => {
+  const env = setup();
+  const fix = card(env, "fix");
+  fix._fragLoeschen(71, "Serie");
+  try { fix._dialog._render(); } catch { /* the test DOM does not parse what the dialog binds */ }
+  const html = fix._dialog.shadowRoot.innerHTML;
+  for (const part of ["busch-dialog", "busch-dialog-head", "busch-dialog-close", "busch-dialog-title", "busch-dialog-content", "busch-dialog-foot"])
+    assert.ok(tagsWith(html, part).length === 1, `${part}: ${html}`);
+  assert.equal(attr(tagsWith(html, "busch-dialog")[0], "data-size"), "confirm", "confirmation is the narrow size");
+  assert.ok(html.indexOf("busch-dialog-close") < html.indexOf("busch-dialog-title"), "X before the title");
+  assert.ok(html.indexOf('data-akt="cancel"') < html.indexOf('data-akt="delete"'), "Abbrechen left of the final action");
+});
