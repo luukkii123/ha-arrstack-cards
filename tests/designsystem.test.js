@@ -503,5 +503,10 @@ test("M26: no own text in the primary colour, only icons, bars, outlines and tin
   const accentText = [...css.matchAll(/([^{}]+)\{([^}]*)\}/g)]
     .filter(([, , body]) => /(?:^|[;\s])color:\s*var\(--(?:arr-accent|primary-color)/.test(body))
     .map(([, selector]) => selector.trim().replace(/\s+/g, " "));
-  assert.deepEqual(accentText, [".head-media", ".head-title .icon"], "accent colour only on the service symbol");
+  // M79 (#1320): the service symbol mixes the accent 60 % with the text colour (>= 3:1), so no rule paints the plain accent.
+  assert.deepEqual(accentText, [], "no plain accent colour on text or symbols");
+  const mixed = [...css.matchAll(/([^{}]+)\{([^}]*)\}/g)]
+    .filter(([, , body]) => /(?:^|[;\s])color:\s*color-mix\(in srgb, var\(--arr-accent\) 60%, var\(--arr-text\)\)/.test(body))
+    .map(([, selector]) => selector.trim().replace(/\s+/g, " "));
+  assert.deepEqual(mixed, [".head-media", ".head-title .icon"], "accent colour only on the service symbol");
 });

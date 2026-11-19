@@ -1130,7 +1130,8 @@ const ARRSTACK_GEMEINSAM = `
     place-items: center;
     border-radius: var(--arr-radius-1);
     background: var(--arr-surface);
-    color: var(--arr-accent);
+    /* M79 (#1320): accent 60 % with the text colour, >= 3:1 on the grey tile (HA blue was 2.09:1). */
+    color: color-mix(in srgb, var(--arr-accent) 60%, var(--arr-text));
   }
   .symbol-pair { display: inline-flex; align-items: center; justify-content: center; }
   [hidden] { display: none !important; }
@@ -1156,7 +1157,8 @@ const ARRSTACK_GEMEINSAM = `
   /* Das echte Logo des Dienstes — es sagt auf einen Blick, ob die Karte auf
      Radarr, Sonarr, SABnzbd oder Jellyseerr schaut. */
   .logo { flex: none; border-radius: var(--arr-radius-1); object-fit: contain; }
-  .head-title .icon { flex: none; color: var(--arr-accent); }
+  /* M79 (#1320): accent 60 % with the text colour, >= 3:1 on the card (HA blue was 2.63:1). */
+  .head-title .icon { flex: none; color: color-mix(in srgb, var(--arr-accent) 60%, var(--arr-text)); }
 
   /* Trennung zuerst über Abstand: Zeilen liegen frei, das Vorschaubild gibt
      den Takt. Eine graue Fläche je Zeile ergab eine Leiter aus Balken — der
@@ -1226,7 +1228,8 @@ const ARRSTACK_GEMEINSAM = `
     background: var(--arr-surface);
     color: var(--arr-muted);
   }
-  .thumb.warn { color: var(--warning-color, #ffa600); }
+  /* M79 (#1320): warning 60 % with the text colour, >= 3:1 on the grey thumb (was 1.56:1). */
+  .thumb.warn { color: color-mix(in srgb, var(--warning-color, #ffa600) 60%, var(--arr-text)); }
 
   .bar {
     height: var(--arr-bar);
