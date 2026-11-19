@@ -342,8 +342,9 @@ const BuschUI = (() => {
  * Bewusst ohne Build-Schritt: eine einzelne Datei, reines Vanilla-JS mit
  * Custom Elements. Was hier steht, ist genau das, was ausgeliefert wird.
  *
- * Neue Karte hinzufügen: Klasse schreiben, `customElements.define(...)`,
- * Eintrag in `window.customCards` — alles in dieser Datei. **Keine
+ * Neue Karte hinzufügen: Klasse schreiben, `BuschUI.register(tag, Klasse,
+ * { type, name, description, preview: false, documentationURL })` am
+ * Dateiende — alles in dieser Datei. **Keine
  * Unterordner:** Eine HACS-Dashboard-Ressource liefert genau eine Datei aus,
  * alles darunter erreicht den Browser nie.
  *
@@ -3222,71 +3223,47 @@ function statusLabel(status, t) {
 
 /* ── Anmeldung ──────────────────────────────────────────────────────────── */
 
-customElements.define(DIALOG_TAG, ArrstackDialog);
+/* Registrierung doppelt-ladefest (M42): wird die Datei ein zweites Mal geladen
+   (zweite Ressourcen-URL, Cache-Parameter), behält BuschUI.register die erste
+   Klasse, wirft kein NotSupportedError und trägt jede Karte nur einmal in
+   `window.customCards` ein. Der Eintrag entsteht beim Laden der Datei — `hass`
+   gibt es da noch nicht; Name und Beschreibung richten sich deshalb nach
+   `navigator.language`. */
+BuschUI.register(DIALOG_TAG, ArrstackDialog);
 
-customElements.define("arrstack-downloads-card", ArrstackDownloadsCard);
-customElements.define("arrstack-recent-card", ArrstackRecentCard);
-customElements.define("arrstack-fix-card", ArrstackFixCard);
-customElements.define("arrstack-seer-card", ArrstackSeerCard);
+BuschUI.register("arrstack-downloads-card", ArrstackDownloadsCard, {
+  type: "arrstack-downloads-card",
+  name: TEXTE_ARRSTACK_DOWNLOADS_CARD[BROWSER_SPRACHE].name,
+  description: TEXTE_ARRSTACK_DOWNLOADS_CARD[BROWSER_SPRACHE].description,
+  preview: false,
+  documentationURL: DOCS_URL,
+});
+BuschUI.register("arrstack-recent-card", ArrstackRecentCard, {
+  type: "arrstack-recent-card",
+  name: TEXTE_ARRSTACK_RECENT_CARD[BROWSER_SPRACHE].name,
+  description: TEXTE_ARRSTACK_RECENT_CARD[BROWSER_SPRACHE].description,
+  preview: false,
+  documentationURL: DOCS_URL,
+});
+BuschUI.register("arrstack-fix-card", ArrstackFixCard, {
+  type: "arrstack-fix-card",
+  name: TEXTE_ARRSTACK_FIX_CARD[BROWSER_SPRACHE].name,
+  description: TEXTE_ARRSTACK_FIX_CARD[BROWSER_SPRACHE].description,
+  preview: false,
+  documentationURL: DOCS_URL,
+});
+BuschUI.register("arrstack-seer-card", ArrstackSeerCard, {
+  type: "arrstack-seer-card",
+  name: TEXTE_ARRSTACK_SEER_CARD[BROWSER_SPRACHE].name,
+  description: TEXTE_ARRSTACK_SEER_CARD[BROWSER_SPRACHE].description,
+  preview: false,
+  documentationURL: DOCS_URL,
+});
 
-customElements.define(
-  "arrstack-downloads-card-editor",
-  ArrstackDownloadsEditor
-);
-customElements.define(
-  "arrstack-recent-card-editor",
-  ArrstackCardEditor.forServices(
-    ["sonarr", "radarr"],
-    SCHEMA_ARRSTACK_RECENT_CARD,
-    TEXTE_ARRSTACK_RECENT_CARD
-  )
-);
-customElements.define(
-  "arrstack-fix-card-editor",
-  ArrstackCardEditor.forServices(
-    ["sonarr", "radarr"],
-    SCHEMA_ARRSTACK_FIX_CARD,
-    TEXTE_ARRSTACK_FIX_CARD
-  )
-);
-customElements.define(
-  "arrstack-seer-card-editor",
-  ArrstackCardEditor.forServices(
-    ["seerr"],
-    SCHEMA_ARRSTACK_SEER_CARD,
-    TEXTE_ARRSTACK_SEER_CARD
-  )
-);
-
-/* Der Eintrag entsteht beim Laden der Datei — `hass` gibt es da noch nicht.
-   Name und Beschreibung richten sich deshalb nach `navigator.language`. */
-window.customCards.push(
-  {
-    type: "arrstack-downloads-card",
-    name: TEXTE_ARRSTACK_DOWNLOADS_CARD[BROWSER_SPRACHE].name,
-    description: TEXTE_ARRSTACK_DOWNLOADS_CARD[BROWSER_SPRACHE].description,
-    preview: false,
-    documentationURL: DOCS_URL,
-  },
-  {
-    type: "arrstack-recent-card",
-    name: TEXTE_ARRSTACK_RECENT_CARD[BROWSER_SPRACHE].name,
-    description: TEXTE_ARRSTACK_RECENT_CARD[BROWSER_SPRACHE].description,
-    preview: false,
-    documentationURL: DOCS_URL,
-  },
-  {
-    type: "arrstack-fix-card",
-    name: TEXTE_ARRSTACK_FIX_CARD[BROWSER_SPRACHE].name,
-    description: TEXTE_ARRSTACK_FIX_CARD[BROWSER_SPRACHE].description,
-    preview: false,
-    documentationURL: DOCS_URL,
-  },
-  {
-    type: "arrstack-seer-card",
-    name: TEXTE_ARRSTACK_SEER_CARD[BROWSER_SPRACHE].name,
-    description: TEXTE_ARRSTACK_SEER_CARD[BROWSER_SPRACHE].description,
-    preview: false,
-    documentationURL: DOCS_URL,
-  }
-);
+BuschUI.register("arrstack-downloads-card-editor", ArrstackDownloadsEditor);
+BuschUI.register("arrstack-recent-card-editor",
+  ArrstackCardEditor.forServices(["sonarr", "radarr"], SCHEMA_ARRSTACK_RECENT_CARD, TEXTE_ARRSTACK_RECENT_CARD));
+BuschUI.register("arrstack-fix-card-editor",
+  ArrstackCardEditor.forServices(["sonarr", "radarr"], SCHEMA_ARRSTACK_FIX_CARD, TEXTE_ARRSTACK_FIX_CARD));
+BuschUI.register("arrstack-seer-card-editor",
+  ArrstackCardEditor.forServices(["seerr"], SCHEMA_ARRSTACK_SEER_CARD, TEXTE_ARRSTACK_SEER_CARD));

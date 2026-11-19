@@ -36,7 +36,7 @@ class Form extends Element {
 const elements = new Map();
 const context = {
   HTMLElement: Element,
-  customElements: { define: (name, type) => elements.set(name, type) },
+  customElements: { define: (name, type) => elements.set(name, type), get: (name) => elements.get(name) },
   document: { createElement: (name) => name === "ha-form" ? new Form() : new Element() },
   window: {},
   navigator: { language: "en" },

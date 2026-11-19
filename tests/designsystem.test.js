@@ -378,3 +378,29 @@ test("M59: the render fixtures write German umlauts, no ASCII transliterations",
     assert.deepEqual(text.match(/ungewoehnlich|ausserordentlich|laenger|Veroeffentlich|aussergewoehnlich/g) || [], [], file);
   }
 });
+
+/* ── M42: double-load safe registration ────────────────────────────────── */
+
+test("M42: a second copy of the bundle (second resource URL) loads without error and adds nothing twice", () => {
+  const first = kit.createEnvironment({ language: "de-DE" });
+  const second = kit.createEnvironment({ language: "de-DE" });
+  // One realm, two module copies: shared registry and window, separate top-level scopes.
+  second.customElements = first.customElements;
+  second.window = first.window;
+  const errors = [];
+  for (const env of [first, second]) {
+    try { kit.loadScript(BUNDLE, { globals: env }); } catch (error) { errors.push(error.message); }
+  }
+  assert.deepEqual(errors, [], "no NotSupportedError / already defined");
+  const types = first.window.customCards.map((entry) => entry.type);
+  assert.deepEqual(types, ["arrstack-downloads-card", "arrstack-recent-card", "arrstack-fix-card", "arrstack-seer-card"], "each card once");
+  for (const tag of ["arrstack-dialog", "arrstack-downloads-card", "arrstack-recent-card", "arrstack-fix-card", "arrstack-seer-card",
+    "arrstack-downloads-card-editor", "arrstack-recent-card-editor", "arrstack-fix-card-editor", "arrstack-seer-card-editor"])
+    assert.ok(first.customElements.get(tag), `${tag} defined`);
+});
+
+test("M42: the bundle registers through BuschUI.register only", () => {
+  assert.ok(!/customElements\.define\s*\(/.test(OWN), "no unguarded customElements.define");
+  assert.ok(!/customCards\.push\s*\(/.test(OWN), "no unguarded customCards.push");
+  assert.equal((OWN.match(/BuschUI\.register\(/g) || []).length >= 1, true);
+});
