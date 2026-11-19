@@ -198,3 +198,28 @@ test("M63: no fixed px font size, no fixed spacing, no capitals in headings in t
   assert.ok(!/text-transform\s*:\s*uppercase|letter-spacing\s*:\s*0?\.\d/.test(OWN), "no capitals in headings");
   assert.ok(!/var\(--ha-space-4,\s*24px\)/.test(OWN), "a fallback matches its token");
 });
+
+/* ── M61: one card head and title step for the whole family ────────────── */
+
+test("M61: the card head is BuschUI.header with title level 1 and the full title", () => {
+  const env = setup();
+  const c = card(env, "fix", { title: "Ein sehr langer Kartentitel für zwei Zeilen" });
+  c._data = { service: "sonarr", items: [] };
+  const head = c._head("download", "4 offen", "warning");
+  const group = tagsWith(head, "busch-ui-header")[0];
+  assert.ok(group && attr(group, "role") === "group", `header group: ${head}`);
+  const title = tagsWith(head, "busch-ui-title")[0];
+  assert.ok(title, `title node: ${head}`);
+  assert.equal(attr(title, "data-level"), "1", "card title step");
+  assert.equal(attr(title, "role"), "heading");
+  assert.equal(attr(title, "title"), "Ein sehr langer Kartentitel für zwei Zeilen", "full title in the tooltip (E12)");
+  assert.ok(head.includes("4 offen"), "status stays in the head");
+});
+
+test("M61: the family sets no own title type; the title may wrap to two lines (E12)", () => {
+  assert.ok(!/(?:^|[\s,}])\.title\s*\{[^}]*font-(?:size|weight)/.test(OWN), "no own .title font size or weight");
+  const clamp = (OWN.match(/\.head \.title\s*\{([^}]*)\}/) || [])[1] || "";
+  assert.match(clamp, /-webkit-line-clamp:\s*2/, "two lines at most");
+  assert.match(clamp, /overflow:\s*hidden/);
+  assert.match(clamp, /overflow-wrap:\s*anywhere/);
+});

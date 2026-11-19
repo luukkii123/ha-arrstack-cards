@@ -1068,7 +1068,7 @@ const ARRSTACK_TOKENS = `
  * Container über seinen Elternteil hinaus, statt zu kürzen.
  */
 const ARRSTACK_EINZEILIG = `
-  .title, .head-meta, .row-title, .row-meta, .row-side .lead, .row-side .sub,
+  .head-meta, .row-title, .row-meta, .row-side .lead, .row-side .sub,
   .lbl, .dlg-title {
     overflow: hidden;
     text-overflow: ellipsis;
@@ -1111,11 +1111,18 @@ const ARRSTACK_GEMEINSAM = `
   }
   .symbol-pair { display: inline-flex; align-items: center; justify-content: center; }
   [hidden] { display: none !important; }
-  .title {
-    font-size: var(--arr-font-lg);
-    font-weight: var(--arr-weight-bold);
-    color: var(--arr-text);
+  /* Kartentitel: Stufe 1 aus BuschUI.header (M61). Er darf auf zwei Zeilen
+     umbrechen und kürzt danach (ui-regeln Regel 1, Ausnahme E12); der volle
+     Titel steht im title-Attribut. */
+  .head .title {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
+  .head-side { display: flex; justify-content: flex-end; min-width: 0; max-width: 100%; }
   .head-meta {
     font-size: var(--arr-font-sm);
     color: var(--arr-muted);
@@ -1267,7 +1274,7 @@ const ARRSTACK_STYLES = BuschUI.cardStyles + ARRSTACK_TOKENS + ARRSTACK_EINZEILI
   /* Status und Aktionen stehen unter dem Titel, sobald die Karte eng wird. */
   @container (max-width: 440px) {
     .head { grid-template-columns: minmax(0, 1fr); gap: var(--arr-space-2); }
-    .head-meta { grid-column: 1; justify-self: start; margin-inline-start: calc(var(--arr-media) + var(--arr-space-2)); }
+    .head-side { grid-column: 1; justify-self: start; margin-inline-start: calc(var(--arr-media) + var(--arr-space-2)); }
     .row { flex-wrap: wrap; }
     .row-side { flex: 1 1 100%; max-width: 100%; flex-direction: row; align-items: center; justify-content: space-between; }
     .actions { flex: 1 1 100%; width: 100%; }
@@ -1297,7 +1304,6 @@ const ARRSTACK_COMPACT = `
 
 
   .head { margin-bottom: var(--arr-space-3); }
-  .title { font-size: var(--arr-font-md); }
   details summary { color: var(--arr-text); }
   .head-media { width: 44px; height: 44px; }
   .poster { width: var(--arr-thumb); height: calc(var(--arr-thumb) * 1.5); }
@@ -1316,7 +1322,7 @@ const ARRSTACK_COMPACT = `
   summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; color: var(--arr-muted); }
   @container (max-width: 440px) {
     .head { grid-template-columns: minmax(0,1fr) auto; }
-    .head-meta { grid-column: auto; margin-inline-start: 0; }
+    .head-side { grid-column: auto; margin-inline-start: 0; }
     .row.result { flex-wrap: nowrap; }
   }
   @media (prefers-reduced-motion: reduce) { .bar > i { transition: none; } }
@@ -1941,13 +1947,25 @@ class ArrstackCardBase extends HTMLElement {
   /** Kopfzeile mit Logo, Titel und optionaler Nebenauskunft. */
   _head(icon, meta = "", tone = "") {
     meta = [meta, this._staleMeta()].filter(Boolean).join(" · ");
-    const node=document.createElement('div');node.className='head';
-    node.innerHTML=`<div class="head-title">
-        <span class="head-media">${serviceSymbol(this._data?.brand || this._data?.service || this._config?.service, icon, 24)}</span>
-        <span class="title">${escapeHtml(this._titel())}</span>
-      </div>
-      ${meta ? (tone ? statusChip(tone, meta, " head-meta") : `<span class="head-meta">${escapeHtml(meta)}</span>`) : ""}`;
-    return BuschUI.header({node,titleNode:node.querySelector('.title')}).outerHTML;
+    const node = document.createElement("div"), lead = document.createElement("div");
+    const media = document.createElement("span"), title = document.createElement("span");
+    node.className = "head";
+    lead.className = "head-title";
+    media.className = "head-media";
+    // serviceSymbol: fixed markup, the brand is URI-encoded.
+    media.innerHTML = serviceSymbol(this._data?.brand || this._data?.service || this._config?.service, icon, 24);
+    title.className = "title";
+    title.textContent = title.title = this._titel();
+    lead.append(media, title);
+    node.append(lead);
+    if (meta) {
+      const side = document.createElement("span");
+      side.className = "head-side";
+      side.innerHTML = tone ? statusChip(tone, meta, " head-meta") : `<span class="head-meta">${escapeHtml(meta)}</span>`;
+      node.append(side);
+    }
+    // M61: the card title is title step 1 of the family (HA card header size, medium weight).
+    return BuschUI.header({ node, titleNode: title, level: 1 }).outerHTML;
   }
 
   getCardSize() {
