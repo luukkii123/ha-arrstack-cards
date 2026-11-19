@@ -1270,7 +1270,7 @@ const ARRSTACK_GEMEINSAM = `
     background: var(--arr-surface);
   }
   .row.result:focus-visible, .search input:focus-visible {
-    outline: 2px solid var(--arr-accent);
+    outline: 2px solid ${BuschUI.tokens.focusColor};
     outline-offset: 2px;
   }
 
@@ -2530,7 +2530,7 @@ const ARRSTACK_DOWNLOADS_STYLES = `
   .queue-reasons .busch-notice + .busch-notice, .queue-reasons .busch-notice + .queue-message { margin-top:var(--arr-space-2); }
   .queue-reasons p { margin:0; overflow-wrap:anywhere; color:var(--arr-muted); font-size:var(--arr-font-sm); }
   .queue-message summary { min-height:44px;display:flex;align-items:center;gap:var(--arr-space-2);cursor:pointer;color:var(--arr-muted);font-size:var(--arr-font-sm); }
-  .queue-message summary:focus-visible { outline:2px solid var(--arr-accent);outline-offset:2px; }
+  .queue-message summary:focus-visible { outline:2px solid ${BuschUI.tokens.focusColor};outline-offset:2px; }
   .queue-message[open] summary { color:var(--arr-text); }
   .queue-pages { display:flex; align-items:center; justify-content:space-between; gap:var(--arr-space-2); margin-top:var(--arr-space-3); }
   .queue-page-label { font-size:var(--arr-font-sm); color:var(--arr-muted); min-width:0; text-align:center; }
