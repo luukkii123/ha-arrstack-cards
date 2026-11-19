@@ -1035,17 +1035,20 @@ const ARRSTACK_TOKENS = `
     --arr-space-2: var(--ha-space-2, 8px);
     --arr-space-3: var(--ha-space-3, 12px);
     --arr-space-4: ${BuschUI.tokens.space4};
-    --arr-radius-1: 6px;
+    /* M63: one inner radius step (8 px, below the 12 px card radius) and the
+       type scale of Shared UI, each with its HA token in front. */
+    --arr-radius-1: ${BuschUI.tokens.radiusInner};
     --arr-radius-2: var(--ha-card-border-radius, 12px);
-    --arr-font-sm: var(--ha-font-size-s, 0.8125rem);
-    --arr-font-md: var(--ha-font-size-m, 0.9375rem);
-    --arr-font-lg: var(--ha-font-size-l, 1.125rem);
+    --arr-font-sm: ${BuschUI.tokens.fontSizeS};
+    --arr-font-md: ${BuschUI.tokens.fontSizeM};
+    --arr-font-lg: ${BuschUI.tokens.fontSizeL};
     --arr-weight-bold: var(--ha-font-weight-bold, 600);
     --arr-poster-w: 44px;
     --arr-poster-h: 66px;
     --arr-thumb: 36px;
     --arr-bar: 6px;
     --arr-logo: 22px;
+    --arr-media: 44px;
     --arr-text: var(--primary-text-color, #212121);
     --arr-muted: var(--secondary-text-color, #727272);
     --arr-accent: var(--primary-color, #03a9f4);
@@ -1097,9 +1100,9 @@ const ARRSTACK_GEMEINSAM = `
     flex: 1 1 auto;
   }
   .head-media {
-    width: 44px;
-    height: 44px;
-    flex: 0 0 44px;
+    width: var(--arr-media);
+    height: var(--arr-media);
+    flex: 0 0 var(--arr-media);
     display: grid;
     place-items: center;
     border-radius: var(--arr-radius-1);
@@ -1264,7 +1267,7 @@ const ARRSTACK_STYLES = BuschUI.cardStyles + ARRSTACK_TOKENS + ARRSTACK_EINZEILI
   /* Status und Aktionen stehen unter dem Titel, sobald die Karte eng wird. */
   @container (max-width: 440px) {
     .head { grid-template-columns: minmax(0, 1fr); gap: var(--arr-space-2); }
-    .head-meta { grid-column: 1; justify-self: start; margin-inline-start: 52px; }
+    .head-meta { grid-column: 1; justify-self: start; margin-inline-start: calc(var(--arr-media) + var(--arr-space-2)); }
     .row { flex-wrap: wrap; }
     .row-side { flex: 1 1 100%; max-width: 100%; flex-direction: row; align-items: center; justify-content: space-between; }
     .actions { flex: 1 1 100%; width: 100%; }
@@ -2280,7 +2283,7 @@ class ArrstackDownloadsEditor extends ArrstackCardEditor {
     this._order.innerHTML=`<summary><span>${escapeHtml(t.spaltenreihenfolge)}</span><small class="queue-order-summary">${escapeHtml(order)}</small></summary><div role="status" aria-live="polite" class="queue-order-status">${escapeHtml(order)}</div>${columns.map((key,index)=>`<div class="queue-order-row"><span>${escapeHtml(queueColumnLabel(key,this._sprache()))}</span><button type="button" class="busch-btn" data-variant="secondary" data-column="${key}" data-move="-1" aria-label="${escapeHtml(`${queueColumnLabel(key,this._sprache())} ${t.nach_oben}`)}" ${index===0 ? 'disabled' : ''}>${escapeHtml(t.hoch)}</button><button type="button" class="busch-btn" data-variant="secondary" data-column="${key}" data-move="1" aria-label="${escapeHtml(`${queueColumnLabel(key,this._sprache())} ${t.nach_unten}`)}" ${index===columns.length-1 ? 'disabled' : ''}>${escapeHtml(t.runter)}</button></div>`).join('')}`;
     this._order.querySelectorAll?.('button').forEach(button=>button.addEventListener('click',()=>this._moveColumn(button.dataset.column,Number(button.dataset.move))));
     if (key) Array.from(this._order.querySelectorAll('button')).find(button=>button.dataset.column===key && button.dataset.move===move)?.focus();
-    if (!this._orderStyle) {this._orderStyle=document.createElement('style');this._orderStyle.textContent=`.queue-column-order{margin-top:var(--ha-space-4,24px);color:var(--primary-text-color)}.queue-column-order summary{cursor:pointer;min-height:44px;display:flex;flex-direction:column;justify-content:center;min-width:0}.queue-order-summary,.queue-order-hint{font-size:var(--ha-font-size-s,0.8125rem);color:var(--secondary-text-color);overflow-wrap:anywhere}.queue-column-order[open] .queue-order-summary{display:none}.queue-order-hint{margin:var(--ha-space-4,24px) 0 0}.queue-order-status{font-size:var(--ha-font-size-s,0.8125rem);overflow-wrap:anywhere;margin-bottom:var(--ha-space-2,8px)}.queue-order-row{display:flex;align-items:center;gap:var(--ha-space-2,8px)}.queue-order-row span{flex:1;min-width:0;overflow-wrap:anywhere}`;this.appendChild(this._orderStyle);}
+    if (!this._orderStyle) {this._orderStyle=document.createElement('style');this._orderStyle.textContent=`.queue-column-order{margin-top:var(--ha-space-6,24px);color:var(--primary-text-color)}.queue-column-order summary{cursor:pointer;min-height:44px;display:flex;flex-direction:column;justify-content:center;min-width:0}.queue-order-summary,.queue-order-hint{font-size:${BuschUI.tokens.fontSizeS};color:var(--secondary-text-color);overflow-wrap:anywhere}.queue-column-order[open] .queue-order-summary{display:none}.queue-order-hint{margin:var(--ha-space-6,24px) 0 0}.queue-order-status{font-size:${BuschUI.tokens.fontSizeS};overflow-wrap:anywhere;margin-bottom:var(--ha-space-2,8px)}.queue-order-row{display:flex;align-items:center;gap:var(--ha-space-2,8px)}.queue-order-row span{flex:1;min-width:0;overflow-wrap:anywhere}`;this.appendChild(this._orderStyle);}
   }
 }
 

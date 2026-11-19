@@ -178,3 +178,23 @@ test("M62: the bundle keeps no own button, chip or notice variants in its CSS", 
   assert.ok(!/\.(?:notice|chip)\s*[{,.]/.test(OWN.replace(/busch-(?:notice|chip)/g, "")), "no own .notice/.chip rules");
   assert.ok(!/\.status-badge\.(?:success|warning|error|unavailable)\s*\{/.test(OWN), "no own status colours");
 });
+
+/* ── M63: spacing, radius and type from tokens ─────────────────────────── */
+
+test("M63: one inner radius step and the type scale come from the shared tokens", () => {
+  const { exposed } = kit.loadScript(BUNDLE, { globals: kit.createEnvironment({ language: "de-DE" }), expose: ["ARRSTACK_TOKENS", "BuschUI"] });
+  const tokens = exposed.ARRSTACK_TOKENS, ui = exposed.BuschUI.tokens;
+  const value = (name) => (tokens.match(new RegExp(`--arr-${name}:\\s*([^;]+);`)) || [])[1]?.trim();
+  assert.equal(value("radius-1"), ui.radiusInner, "inner radius: the one shared step (8 px)");
+  assert.equal(value("font-sm"), ui.fontSizeS, "small type");
+  assert.equal(value("font-md"), ui.fontSizeM, "body type");
+  assert.equal(value("font-lg"), ui.fontSizeL, "large type");
+});
+
+test("M63: no fixed px font size, no fixed spacing, no capitals in headings in the own CSS", () => {
+  const css = OWN.replace(/var\([^()]*(?:\([^()]*\)[^()]*)*\)/g, "var()");
+  assert.deepEqual(css.match(/font-size\s*:\s*[\d.]+(?:px|rem|em)/g) || [], [], "font sizes only through tokens");
+  assert.deepEqual(css.match(/(?:margin|padding|gap)[\w-]*\s*:[^;"`]*\b\d+px/g) || [], [], "spacing only through tokens");
+  assert.ok(!/text-transform\s*:\s*uppercase|letter-spacing\s*:\s*0?\.\d/.test(OWN), "no capitals in headings");
+  assert.ok(!/var\(--ha-space-4,\s*24px\)/.test(OWN), "a fallback matches its token");
+});
