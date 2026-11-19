@@ -2536,15 +2536,16 @@ class ArrstackDownloadsCard extends ArrstackImportCardBase {
       if (key==='status') markup=`<span class="status-badge ${queueTone(item)}">${escapeHtml(queueStatusText(item,t) || '—')}</span>`;
       else if (key==='progress') markup=`<div class="queue-progress"><span>${Math.round(progress)} %</span><div class="bar" role="progressbar" aria-label="${escapeHtml(queueColumnLabel(key,this._sprache()))}" aria-valuenow="${progress}" aria-valuemin="0" aria-valuemax="100"><i style="width:${progress}%"></i></div></div>`;
       else markup=`<span class="queue-value" title="${escapeHtml(value ?? '')}">${escapeHtml(value==null || value==='' ? '—' : value)}</span>`;
-      return `<div role="cell" class="queue-cell" data-column="${key}" aria-label="${escapeHtml(queueColumnLabel(key,this._sprache()))}"><span class="queue-label">${escapeHtml(queueColumnLabel(key,this._sprache()))}</span>${markup}</div>`;
+      // M58: no aria-label on a cell, it would replace the value; the column header names it.
+      return `<div role="cell" class="queue-cell" data-column="${key}"><span class="queue-label">${escapeHtml(queueColumnLabel(key,this._sprache()))}</span>${markup}</div>`;
     }).join('');
     const problem=this._itemErrors.get(this._id(item));
     const reasons=(item.messages || []).filter(message=>typeof message==='string' && message.trim());
     return `<div role="row" class="queue-grid queue-row" data-item="${this._id(item)}">
-      ${this._config.show_posters ? `<div role="cell" aria-label="${escapeHtml(t.poster)}" class="queue-poster">${posterMarkup(item.poster,this._data?.brand,'download')}</div>` : ''}
+      ${this._config.show_posters ? `<div role="cell" class="queue-poster">${posterMarkup(item.poster,this._data?.brand,'download')}</div>` : ''}
       <div class="queue-fields">${cells}</div>
-      <div role="cell" aria-label="${escapeHtml(t.aktionen)}" class="queue-action">${this._canInspect(item) ? `<button class="act-check quiet" title="${escapeHtml(t.dialog_pruefen)}" aria-label="${escapeHtml(`${t.dialog_pruefen}: ${title}`)}" ${this._busy ? 'disabled' : ''}>${arrIcon('search')}</button>` : ''}</div>
-      ${problem || reasons.length ? `<div role="cell" aria-label="${escapeHtml(t.import_status)}" class="queue-reasons">${problem ? this._importErrorMarkup(problem,t.import_fehler) : ''}${reasons.length ? `<details class="queue-message"><summary>${arrIcon("alert")}<span>${escapeHtml(t.import_hinweise)} (${reasons.length})</span></summary>${reasons.map(reason=>`<p>${escapeHtml(reason)}</p>`).join('')}</details>` : ''}</div>` : ''}
+      <div role="cell" class="queue-action">${this._canInspect(item) ? `<button class="act-check quiet" title="${escapeHtml(t.dialog_pruefen)}" aria-label="${escapeHtml(`${t.dialog_pruefen}: ${title}`)}" ${this._busy ? 'disabled' : ''}>${arrIcon('search')}</button>` : ''}</div>
+      ${problem || reasons.length ? `<div role="cell" class="queue-reasons">${problem ? this._importErrorMarkup(problem,t.import_fehler) : ''}${reasons.length ? `<details class="queue-message"><summary>${arrIcon("alert")}<span>${escapeHtml(t.import_hinweise)} (${reasons.length})</span></summary>${reasons.map(reason=>`<p>${escapeHtml(reason)}</p>`).join('')}</details>` : ''}</div>` : ''}
     </div>`;
   }
 

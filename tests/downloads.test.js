@@ -131,3 +131,30 @@ test('rejected callWS during import sets an operation error and releases busy',a
  assert.equal(c._message,null,'no success message');
  assert.equal(loads,1,'queue reloaded after the failure');
 });
+
+// M58 (#1308): a cell's name must not replace its content. Column names come
+// from role=columnheader; cells without visible text carry the label on the
+// control inside them.
+const cellOpenTags=html=>[...html.matchAll(/<[a-z]+\b[^>]*\brole="cell"[^>]*>/g)].map(match=>match[0]);
+test('queue cells carry no aria-label, column headers name every column',()=>{
+ const c=make();
+ c._config.columns=['title','status','episode','timeleft','progress','quality','indexer'];
+ c._config.show_posters=true;
+ c._data.items=[{...item,poster:'https://image.tmdb.org/t/p/w300/a.jpg',quality:'1080p',indexer:'Beispiel'}];
+ c._itemErrors.set(71,{message:'Import bereits übermittelt. Warteschlange aktualisieren.'});
+ const html=c._body();
+ const cells=cellOpenTags(html);
+ assert(cells.length>=c._config.columns.length+2,'Poster-, Daten-, Aktions- und Hinweiszellen gerendert');
+ assert.deepEqual(cells.filter(tag=>/\baria-label=/.test(tag)),[],'keine Zelle mit aria-label');
+ const headers=[...html.matchAll(/<span role="columnheader"([^>]*)>([^<]*)<\/span>/g)];
+ assert.equal(headers.length,c._config.columns.length+2,'Poster-, Spalten- und Aktionskopf');
+ for (const [,attributes,text] of headers) assert(text.trim() || /aria-label="[^"]+"/.test(attributes),`Spaltenkopf ohne Namen: ${attributes}`);
+ assert.match(html,/<span role="columnheader" aria-label="Poster"><\/span>/,'Posterspalte am Kopf benannt');
+ assert.match(html,/<span role="columnheader" aria-label="Aktionen"><\/span>/,'Aktionsspalte am Kopf benannt');
+ if (c._canInspect(c._data.items[0])) assert.match(html,/<button class="act-check quiet"[^>]*aria-label="Dateien prüfen: Eine lange Beispielserie"/,'Knopf trägt sein Label selbst');
+});
+
+test('the bundle renders no role=cell together with aria-label',()=>{
+ const source=fs.readFileSync(__dirname+'/../dist/arrstack-cards.js','utf8');
+ assert.deepEqual(cellOpenTags(source),cellOpenTags(source).filter(tag=>!/\baria-label=/.test(tag)),'Quelltext ohne Zelle mit aria-label');
+});
