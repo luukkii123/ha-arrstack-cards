@@ -424,6 +424,8 @@ try:
         # Je Liste (Zuletzt, Import, Suche) und Breite: das Poster steht links
         # neben der Hauptspalte, nie darüber; die Zeit der Zuletzt-Liste steht
         # sichtbar in der Metazeile ihrer Zeile; jede Zeilenaktion misst 44 px.
+        # Über alle vier Listen samt Download-Tabelle: gleiche Postergröße, gleiche
+        # Poster- und Inhaltskante; im Import die Auswahl überall zuerst an derselben Stelle.
         for breite in (320, 390, 480, 960):
             page.set_viewport_size({"width": breite, "height": 1200})
             page.wait_for_timeout(150)
@@ -450,6 +452,52 @@ try:
                     if (act.getBoundingClientRect().height < 44) out.verstoesse.push(id + ': Aktion unter 44 px: ' + act.className);
                 }
               }
+              // Bildprüfung 19.11. (alle-960-dark.png): eine Postergröße und eine Inhaltskante
+              // für alle vier Listen, die Download-Tabelle eingeschlossen.
+              const kante = [];
+              const miss = (name, row, poster, inhalt) => {
+                const card = window.__cards[name].shadowRoot.querySelector('ha-card').getBoundingClientRect();
+                const p = poster.getBoundingClientRect(), c = inhalt.getBoundingClientRect();
+                kante.push({id: name + ':' + (row.dataset.item || row.dataset.index || ''), links: p.left - card.left,
+                            breite: p.width, hoehe: p.height, inhalt: c.left - card.left});
+              };
+              for (const row of window.__cards.downloads.shadowRoot.querySelectorAll('.queue-row')) {
+                const poster = [...row.querySelectorAll('.queue-poster > .poster')].find(el => el.getClientRects().length);
+                const titel = row.querySelector('.queue-cell[data-column=title]');
+                if (!poster || !titel) { out.verstoesse.push('downloads:' + row.dataset.item + ': Poster oder Titel fehlt'); continue; }
+                out.zeilen++; miss('downloads', row, poster, titel);
+              }
+              for (const name of ['recent', 'fix', 'seer'])
+                for (const row of window.__cards[name].shadowRoot.querySelectorAll('.rows > .row')) {
+                  const poster = [...row.children].find(el => el.classList.contains('poster') && el.getClientRects().length);
+                  const main = row.querySelector(':scope > .row-main');
+                  if (poster && main) miss(name, row, poster, main);
+                }
+              for (const key of ['links', 'breite', 'hoehe', 'inhalt']) {
+                const werte = kante.map(k => k[key]);
+                if (Math.max(...werte) - Math.min(...werte) > 1)
+                  out.verstoesse.push('Raster ungleich (' + key + '): ' + kante.map(k => k.id + '=' + Math.round(k[key])).join(', '));
+              }
+              // Import: die Auswahl steht in jeder Zeile an derselben Stelle, als Erstes der
+              // Aktionsreihe; die Aktionsreihe beginnt in jeder Zeile an derselben Kante und
+              // passt bei 960 px in eine Reihe.
+              const reihen = [...window.__cards.fix.shadowRoot.querySelectorAll('.import-row .actions')];
+              if (!reihen.length) out.verstoesse.push('fix: keine Aktionsreihe gemessen');
+              const lage = reihen.map(reihe => {
+                const id = 'fix:' + reihe.closest('[data-item]').dataset.item;
+                const teile = [...reihe.children].filter(el => el.getClientRects().length);
+                const wahl = reihe.querySelector(':scope > .select-label');
+                if (!wahl || teile[0] !== wahl) out.verstoesse.push(id + ': Auswahl nicht als Erstes der Aktionsreihe');
+                if (innerWidth >= 960 && teile.some(el => Math.abs(el.getBoundingClientRect().top - teile[0].getBoundingClientRect().top) > 1))
+                  out.verstoesse.push(id + ': Aktionen nicht in einer Reihe');
+                return {id, reihe: reihe.getBoundingClientRect().left, wahl: wahl ? wahl.getBoundingClientRect().left : NaN};
+              });
+              for (const key of ['reihe', 'wahl']) {
+                const werte = lage.map(l => l[key]);
+                if (werte.some(Number.isNaN) || Math.max(...werte) - Math.min(...werte) > 1)
+                  out.verstoesse.push('Import ' + key + ' ungleich: ' + lage.map(l => l.id + '=' + Math.round(l[key])).join(', '));
+              }
+              out.kante = kante;
               return out;
             }""")
         page.set_viewport_size({"width": WIDTH, "height": 1200})

@@ -385,6 +385,50 @@ test("M59: every status chip carries a symbol, the selection has a visible label
   assert.match(select, /aria-label="Auswählen: /, "the accessible name contains the visible label (WCAG 2.5.3)");
 });
 
+test("M59: every list uses one poster size, so the content column starts at the same place in every card", () => {
+  // Bildprüfung 19.11. (alle-960-dark.png): downloads and recent 44 px posters, import and search 36 px.
+  const posterRules = [...OWN.matchAll(/\n\s*\.poster\s*\{([^}]*)\}/g)].map((m) => m[1]);
+  assert.equal(posterRules.length, 1, `one .poster rule, got ${posterRules.length}`);
+  assert.match(posterRules[0], /width:\s*var\(--arr-poster-w\)/);
+  assert.match(posterRules[0], /height:\s*var\(--arr-poster-h\)/);
+  assert.match(OWN, /--queue-poster:\s*var\(--arr-poster-w\)/, "the queue poster column uses the same width");
+});
+
+test("M59: every import row has the selection in the same slot, first in the action row, then the buttons in a fixed order", () => {
+  const env = setup();
+  const fix = card(env, "fix", { max_items: 10 });
+  fix._data = { service: "sonarr", items: [
+    { ...QUEUE_ITEM, id: 81, queue_item_id: 81, import_state: "selection_required", candidate_count: 2 },
+    { ...QUEUE_ITEM },
+    { ...QUEUE_ITEM, id: 82, queue_item_id: 82, import_state: "no_match", candidate_count: 0 },
+    { ...QUEUE_ITEM, id: 83, queue_item_id: 83, download_complete: false, progress: 50, status: "downloading", import_state: "not_applicable" },
+  ] };
+  fix._render();
+  const html = fix.shadowRoot.innerHTML;
+  const rows = html.split(/<div class="row import-row"/).slice(1);
+  assert.equal(rows.length, 4, "four import rows");
+  const order = ["act-import", "act-check", "act-delete"];
+  for (const row of rows) {
+    const id = (row.match(/data-item="(\d+)"/) || [])[1];
+    const actions = (row.match(/<div class="actions">([\s\S]*?)<\/div>/) || [])[1] || "";
+    assert.match(actions, /^\s*<label class="select-label"/, `row ${id}: the selection comes first in the action row`);
+    const select = (actions.match(/<label class="select-label"[\s\S]*?<\/label>/) || [""])[0];
+    assert.match(select, /<span class="lbl">Auswählen<\/span>/, `row ${id}: visible label`);
+    const ready = id === "71";
+    assert.equal(/<input[^>]*\sdisabled/.test(select), !ready, `row ${id}: the box is ${ready ? "enabled" : "disabled"}`);
+    if (!ready) assert.match(select, /title="Nur importbereite Einträge lassen sich auswählen\."/, `row ${id}: the disabled box says why`);
+    const seen = [...actions.matchAll(/class="(act-[a-z]+) busch-btn"/g)].map((m) => m[1]);
+    assert.deepEqual(seen, order.filter((name) => seen.includes(name)), `row ${id}: buttons in fixed order`);
+  }
+  // A disabled box is not a selection: a click on it changes nothing.
+  assert.equal(fix._selected.size, 0);
+});
+
+test("M59: the reason for a disabled selection is in the dictionary, German and English", () => {
+  assert.match(SOURCE, /auswahl_nicht_bereit: 'Nur importbereite Einträge lassen sich auswählen\.'/);
+  assert.match(SOURCE, /auswahl_nicht_bereit: 'Only items ready to import can be selected\.'/);
+});
+
 test("M59: the render fixtures write German umlauts, no ASCII transliterations", () => {
   for (const file of ["render.py", "visual-contract.py", "compact-contract.py"]) {
     const text = fs.readFileSync(path.join(__dirname, "..", "docs", "render", file), "utf8");

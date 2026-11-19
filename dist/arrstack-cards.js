@@ -841,6 +841,7 @@ const TEXTE_ARRSTACK_FIX_CARD = {
       bulk: 'Bereite importieren',
       auswahl_importieren: 'Auswahl importieren',
       auswaehlen: 'Auswählen',
+      auswahl_nicht_bereit: 'Nur importbereite Einträge lassen sich auswählen.',
       ausgewaehlt: '{n} ausgewählt',
       uebermittelt: '{n} Importauftrag/-aufträge übermittelt.',
       teilfehler: '{n} Eintrag/Einträge fehlgeschlagen. Bitte Details prüfen.',
@@ -895,6 +896,7 @@ const TEXTE_ARRSTACK_FIX_CARD = {
       bulk: 'Import ready',
       auswahl_importieren: 'Import selected',
       auswaehlen: 'Select',
+      auswahl_nicht_bereit: 'Only items ready to import can be selected.',
       ausgewaehlt: '{n} selected',
       uebermittelt: '{n} import command(s) submitted.',
       teilfehler: '{n} item(s) failed. Please check details.',
@@ -1319,9 +1321,11 @@ const ARRSTACK_COMPACT = `
   .head { margin-bottom: var(--arr-space-3); }
   details summary { color: var(--arr-text); }
   .head-media { width: 44px; height: 44px; }
-  .poster { width: var(--arr-thumb); height: calc(var(--arr-thumb) * 1.5); }
   .import-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--arr-space-2); margin: var(--arr-space-3) 0; }
   .select-label { display: inline-flex; align-items: center; gap: var(--arr-space-2); min-height: 44px; cursor: pointer; }
+  /* M59: every import row shows its selection in the same slot; a row that cannot be
+     selected keeps the slot with a disabled box and says why in the title. */
+  .select-label[aria-disabled=true] { cursor: default; color: var(--arr-muted); }
   input[type=checkbox], input[type=radio] { accent-color: var(--arr-accent); }
   details:not([open]) > :not(summary) { display: none; }
   .select-label > .dlg-text { display: block; min-width: 0; }
@@ -2870,9 +2874,9 @@ class ArrstackFixCard extends ArrstackImportCardBase {
         ${statusChip(complete ? (ready ? "success" : "warning") : queueTone(item), `${Math.round(Number(item.progress)||0)} % · ${status}`)}
         ${problem ? this._importErrorMarkup(problem,t.import_fehler) : ""}
         <div class="actions">
+          <label class="select-label"${ready ? "" : ` aria-disabled="true" title="${escapeHtml(t.auswahl_nicht_bereit)}"`}><input type="checkbox" class="item-select" aria-label="${escapeHtml(`${t.auswaehlen}: ${item.parent_title || item.title}`)}" ${ready && this._selected.has(id) ? "checked" : ""} ${this._busy || !ready ? "disabled" : ""}><span class="lbl">${escapeHtml(t.auswaehlen)}</span></label>
           ${ready ? `<button class="act-import busch-btn" data-variant="secondary" ${this._busy ? "disabled" : ""}>${escapeHtml(t.importieren)}</button>` : ""}
           ${complete ? `<button class="act-check busch-btn" data-variant="secondary" ${this._busy ? "disabled" : ""}>${escapeHtml(item.import_state === "selection_required" ? t.auswahl_datei : t.pruefen)}</button>` : ""}
-          ${ready ? `<label class="select-label"><input type="checkbox" class="item-select" aria-label="${escapeHtml(`${t.auswaehlen}: ${item.parent_title || item.title}`)}" ${this._selected.has(id) ? "checked" : ""} ${this._busy ? "disabled" : ""}><span class="lbl">${escapeHtml(t.auswaehlen)}</span></label>` : ""}
           <button class="act-delete busch-btn" data-variant="destructive" ${this._busy ? "disabled" : ""}>${escapeHtml(t.loeschen)}</button>
         </div>
       </div>
