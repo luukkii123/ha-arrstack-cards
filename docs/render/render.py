@@ -150,7 +150,19 @@ PAGE = """<!doctype html>
 <div id="wrap"></div>
 <script>
   /* ── Attrappen für die Home-Assistant-Elemente ─────────────────────────── */
-  class HaCard extends HTMLElement {}
+  /* The real ha-card paints its surface in its own shadow root (:host). The
+     page rule `ha-card {…}` above never reaches an ha-card inside a card's
+     shadow root, so without this the cards stood on the page background and
+     the contrast measurement (M26) compared text with the wrong surface. */
+  class HaCard extends HTMLElement {
+    constructor() {
+      super();
+      this.attachShadow({mode: 'open'}).innerHTML = '<style>:host { display: block; position: relative; box-sizing: border-box;'
+        + ' background: var(--ha-card-background, var(--card-background-color, #fff)); color: var(--primary-text-color);'
+        + ' border-radius: var(--ha-card-border-radius, 12px); border: var(--ha-card-border-width, 1px) solid'
+        + ' var(--ha-card-border-color, var(--divider-color, #e0e0e0)); }</style><slot></slot>';
+    }
+  }
   customElements.define('ha-card', HaCard);
   class HaIcon extends HTMLElement {
     connectedCallback() { this.style.display = 'inline-block';

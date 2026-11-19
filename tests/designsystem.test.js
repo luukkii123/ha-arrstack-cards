@@ -429,6 +429,18 @@ test("M26: the outlined destructive button text reaches 4.5:1 in light and dark"
   }
 });
 
+test("M26: the render mock ha-card paints HA's card surface, so contrast is measured against the card", () => {
+  // Final run 19.11.: 85 contrast findings, all secondary text #727272 on rgb(242,244,247) –
+  // the page background, because the mock ha-card inside the card's shadow root had no surface.
+  const render = fs.readFileSync(path.join(__dirname, "..", "docs", "render", "render.py"), "utf8");
+  const mock = (render.match(/class HaCard extends HTMLElement \{[\s\S]*?\n {2}\}\n/) || [""])[0];
+  assert.match(mock, /attachShadow/, "the mock styles itself like the real element (shadow :host)");
+  assert.match(mock, /:host\s*\{[^}]*background:\s*var\(--ha-card-background,\s*var\(--card-background-color/, "HA's ha-card background");
+  const page = (render.match(/--seite-hintergrund:\s*(#[0-9a-f]{6})/) || [])[1];
+  assert.ok(contrast(hex("#727272"), hex(page)) < 4.5, "on the page background the secondary text fails (measuring error)");
+  assert.ok(contrast(hex("#727272"), hex(THEMES.light.card)) >= 4.5, "on HA's card surface it passes");
+});
+
 test("M26: no own text in the primary colour, only icons, bars, outlines and tints", () => {
   const css = OWN.replace(/\/\*[\s\S]*?\*\//g, "");
   const accentText = [...css.matchAll(/([^{}]+)\{([^}]*)\}/g)]
