@@ -1240,11 +1240,13 @@ const ARRSTACK_GEMEINSAM = `
     background: var(--arr-surface);
     overflow: hidden;
   }
+  /* #1320 (WCAG 1.4.11): the fill is the accent 60 % with the text colour, >= 3:1 on the card and the track
+     (HA blue light was 2.63/2.09:1, #1c76be keeps more). */
   .bar > i {
     display: block;
     height: 100%;
     border-radius: var(--arr-bar);
-    background: var(--arr-accent);
+    background: color-mix(in srgb, var(--arr-accent) 60%, var(--arr-text));
     transition: width 0.4s ease;
   }
 
@@ -1336,7 +1338,8 @@ const ARRSTACK_COMPACT = `
   /* M59: every import row shows its selection in the same slot; a row that cannot be
      selected keeps the slot with a disabled box and says why in the title. */
   .select-label[aria-disabled=true] { cursor: default; color: var(--arr-muted); }
-  input[type=checkbox], input[type=radio] { accent-color: var(--arr-accent); }
+  /* #1320: the checked box in the same mix, >= 3:1 on the card (HA blue light was 2.63:1). */
+  input[type=checkbox], input[type=radio] { accent-color: color-mix(in srgb, var(--arr-accent) 60%, var(--arr-text)); }
   details:not([open]) > :not(summary) { display: none; }
   .select-label > .dlg-text { display: block; min-width: 0; }
   .candidate + .candidate { margin-top: var(--arr-space-3); }

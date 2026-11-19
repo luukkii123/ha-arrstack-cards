@@ -58,3 +58,23 @@ test("M79 coloured symbols reach 3:1 on their surface (head media, title icon, w
   assert.equal(all.length, 12);
   assert.deepEqual(low, []);
 });
+
+// #1320 (Etappe I, Kontrast-Rest, user decision: no exception for graphics): the progress fill carries the amount and
+// reaches 3:1 against the card and against its own track; the checked import checkbox (accent colour) reaches 3:1 on
+// the card (WCAG 1.4.11). Same themes as above, HA blue included.
+test("#1320 progress fill and checkbox accent reach 3:1 (card, track), light and dark, Arrstack and HA blue", () => {
+  const all = [], low = [];
+  for (const [name, t] of Object.entries(THEMEN)) {
+    const karte = hex(t["card-background-color"]), spur = farbe(wert(regel(".bar"), "background"), t);
+    const faelle = [
+      ["bar fill/card", wert(regel(".bar > i"), "background"), karte],
+      ["bar fill/track", wert(regel(".bar > i"), "background"), spur],
+      ["checkbox/card", wert(regel("input[type=checkbox], input[type=radio]"), "accent-color"), karte],
+    ];
+    for (const [art, fg, bg] of faelle) {
+      const q = quote(farbe(fg, t), bg); all.push(`${art} ${name}: ${q.toFixed(2)}:1`); if (q < 3) low.push(all.at(-1));
+    }
+  }
+  assert.equal(all.length, 12);
+  assert.deepEqual(low, []);
+});
