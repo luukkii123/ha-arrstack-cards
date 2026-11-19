@@ -152,7 +152,7 @@ test('queue cells carry no aria-label, column headers name every column',()=>{
  for (const [,attributes,text] of headers) assert(text.trim() || /aria-label="[^"]+"/.test(attributes),`Spaltenkopf ohne Namen: ${attributes}`);
  assert.match(html,/<span role="columnheader" aria-label="Poster"><\/span>/,'Posterspalte am Kopf benannt');
  assert.match(html,/<span role="columnheader" aria-label="Aktionen"><\/span>/,'Aktionsspalte am Kopf benannt');
- if (c._canInspect(c._data.items[0])) assert.match(html,/<button class="act-check quiet"[^>]*aria-label="Dateien prüfen: Eine lange Beispielserie"/,'Knopf trägt sein Label selbst');
+ if (c._canInspect(c._data.items[0])) assert.match(html,/<button class="act-check busch-btn"[^>]*aria-label="Dateien prüfen: Eine lange Beispielserie"/,'Knopf trägt sein Label selbst');
 });
 
 test('the bundle renders no role=cell together with aria-label',()=>{

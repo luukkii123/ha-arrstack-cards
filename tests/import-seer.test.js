@@ -12,7 +12,7 @@ const blocked={id:71,title:'Blockierter Download',status:'completed',tracked_sta
 const makeFix=()=>{const fix=new (types.get('arrstack-fix-card'))(); fix._config={}; fix._hass={locale:{language:'de'}}; return fix;};
 const makeDownloads=(service='sonarr')=>{const downloads=new (types.get('arrstack-downloads-card'))();downloads._config={};downloads._hass={locale:{language:'de'}};downloads._data={service};return downloads;};
 const makeSeer=()=>{const seer=new (types.get('arrstack-seer-card'))();seer._config={};seer._hass={locale:{language:'de'}};return seer;};
-const badge=(seer,status)=>{seer._results=[{id:1,media_type:'movie',title:'Film',status}];seer._error=null;return seer._body().match(/<span class="status-badge[^"]*">([^<]*)<\/span>/)[1];};
+const badge=(seer,status)=>{seer._results=[{id:1,media_type:'movie',title:'Film',status}];seer._error=null;return seer._body().match(/<span class="status-badge[^"]*"[^>]*><span class="lbl">([^<]*)<\/span>/)[1];};
 
 test('fix card: unfinished downloads offer no import and no candidate status', () => {
  const fix=makeFix();
@@ -240,7 +240,7 @@ test('seer_status: Object.prototype names fall back to "not requested"', () => {
 test('queue status: Object.prototype names in status, tracked_state and import_state show the raw value', () => {
  const downloads=makeDownloads();const fix=makeFix();const t=downloads._t();
  for(const value of PROTO_KEYS) {
-   const status=downloads._row({id:1,title:'X',status:value,tracked_state:value,progress:10}).match(/<span class="status-badge[^"]*">([^<]*)<\/span>/)[1];
+   const status=downloads._row({id:1,title:'X',status:value,tracked_state:value,progress:10}).match(/<span class="status-badge[^"]*"[^>]*><span class="lbl">([^<]*)<\/span>/)[1];
    assert.equal(status,value,`downloads ${value}`);
    assert.equal(fix._stateLabel({status:value,tracked_state:value,import_state:value}),value,`fix ${value}`);
  }

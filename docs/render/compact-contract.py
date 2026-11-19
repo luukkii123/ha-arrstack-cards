@@ -398,7 +398,7 @@ with sync_playwright() as pw:
     page.locator('codex-arrcompact-dialog [data-akt=import]').click()
     page.wait_for_function("!!window.__cards.downloads._open?.fehler?.fachlich && !window.__cards.downloads._busy")
     check('queue-returned-error-one-count',"() => {const c=window.__cards.downloads;return c._message.includes('1 Eintrag') && !c._message.includes('0 Import') && !c._message.includes('nicht importiert');}")
-    check('queue-returned-error-no-duplicate',"() => {const r=document.querySelector('codex-arrcompact-dialog').shadowRoot;return r.querySelectorAll('.notice.problem').length===1 && r.querySelector('.notice').innerText.includes('Import bereits übermittelt.') && !r.querySelector('.notice').innerText.includes('/api/v3/manualimport');}")
+    check('queue-returned-error-no-duplicate',"() => {const r=document.querySelector('codex-arrcompact-dialog').shadowRoot;return r.querySelectorAll('.busch-notice[data-tone=error]').length===1 && r.querySelector('.busch-notice[data-tone=error]').innerText.includes('Import bereits übermittelt.') && !r.querySelector('.busch-notice[data-tone=error]').innerText.includes('/api/v3/manualimport');}")
     page.locator('codex-arrcompact-dialog').screenshot(path=str(output/'queue-dialog-error-960-dark.png'))
     page.evaluate('window.__importBackendError=false;window.__deferImport=true')
     page.locator('codex-arrcompact-dialog [data-akt=import]').click()

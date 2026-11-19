@@ -90,3 +90,91 @@ test("M27: the card texts fill the state block (de and en), no own empty markup 
   assert.ok(c._body().includes(">Nothing added yet.<"), "English empty text");
   assert.ok(!/class="empty/.test(OWN), "no own .empty block left in the bundle");
 });
+
+/* ── M62: shared base components instead of own variants ───────────────── */
+
+const QUEUE_ITEM = { id: 71, queue_item_id: 71, title: "Release", parent_title: "Serie", episode: "S01E02", status: "completed",
+  tracked_state: "importBlocked", is_problem: true, sizeleft: 0, progress: 100, messages: ["Hinweis"], download_complete: true,
+  import_state: "ready", candidate_count: 1, candidates: [] };
+
+/** Every card in a full state (rows, pager, toolbar, messages, item errors, season draft) plus both dialogs and the editor order. */
+function fullMarkup() {
+  const env = setup();
+  const parts = {};
+  const downloads = card(env, "downloads", { max_items: 1 });
+  downloads._data = { service: "sonarr", items: [QUEUE_ITEM, { ...QUEUE_ITEM, id: 72, queue_item_id: 72 }] };
+  downloads._message = "Übermittelt.";
+  downloads._operationError = new Error("refused");
+  downloads._itemErrors.set(71, { message: "Import bereits übermittelt." });
+  downloads._render();
+  parts.downloads = downloads.shadowRoot.innerHTML;
+  const recent = card(env, "recent");
+  recent._data = { items: [{ title: "Film", subtitle: "2026", quality: "WEB", added: "2020-01-01T00:00:00Z" }] };
+  recent._render();
+  parts.recent = recent.shadowRoot.innerHTML;
+  const fix = card(env, "fix", { max_items: 1 });
+  fix._data = { service: "sonarr", items: [QUEUE_ITEM, { ...QUEUE_ITEM, id: 72, queue_item_id: 72, import_state: "selection_required", candidate_count: 2 }] };
+  fix._selected.add(71);
+  fix._message = "Gesperrt.";
+  fix._itemErrors.set(71, { message: "Import bereits übermittelt." });
+  fix._render();
+  parts.fix = fix.shadowRoot.innerHTML;
+  fix._fragLoeschen(71, "Serie");
+  try { fix._dialog._render(); } catch { /* the test DOM does not parse the dialog markup it binds */ }
+  parts.deleteDialog = fix._dialog.shadowRoot.innerHTML;
+  fix._dialog._discardPrompt = true;
+  try { fix._dialog._render(); } catch { /* see above */ }
+  parts.discardDialog = fix._dialog.shadowRoot.innerHTML;
+  const seer = card(env, "seer");
+  seer._results = [{ id: 1, media_type: "tv", title: "Serie", date: "2020", status: "available" }];
+  seer._show = { id: 1, media_type: "tv", seasons: [{ season: 1, episodes: 3, status_code: 1 }, { season: 2, episodes: 3, status_code: 5 }] };
+  seer._selected.add(1);
+  seer._message = "Angefragt (Nr. 7).";
+  seer._requestError = new Error("refused");
+  seer._render();
+  parts.seer = seer.shadowRoot.innerHTML;
+  seer._discardInline = true;
+  seer._render();
+  parts.seerDiscard = seer.shadowRoot.innerHTML;
+  const editor = env.document.createElement("arrstack-downloads-card-editor");
+  editor.setConfig({ type: "custom:arrstack-downloads-card", columns: ["title", "status"] });
+  editor.hass = { locale: { language: "de" }, callWS: () => new Promise(() => {}) };
+  parts.editorOrder = editor._order.innerHTML;
+  return parts;
+}
+
+test("M62: every button of cards, dialogs and editor is a shared base component", () => {
+  const parts = fullMarkup();
+  const BASE = /class="(?:[^"]* )?(?:busch-btn|busch-chip|busch-ui-action)(?: [^"]*)?"/;
+  for (const [where, html] of Object.entries(parts)) {
+    const buttons = [...html.matchAll(/<button\b[^>]*>/g)].map((m) => m[0]);
+    if (where !== "recent") assert.ok(buttons.length, `${where}: buttons rendered`);
+    assert.deepEqual(buttons.filter((tag) => !BASE.test(tag)), [], `${where}: own button variant`);
+  }
+  assert.ok(/class="act-delete busch-btn" data-variant="destructive"/.test(parts.fix), "delete in a row is the destructive variant");
+  assert.ok(/data-akt="delete"[^>]*|data-variant="destructive" data-filled/.test(parts.deleteDialog) && /data-variant="destructive" data-filled/.test(parts.deleteDialog), "final delete is the filled destructive variant");
+  assert.ok(/class="busch-btn" data-variant="primary"[^>]*data-inline-action="request"/.test(parts.seer), "the request is the one primary button");
+  assert.ok(/class="season busch-chip"/.test(parts.seer), "season toggles are chips");
+});
+
+test("M62: status is a busch-chip with tone, messages and item errors are busch-notices", () => {
+  const parts = fullMarkup();
+  for (const where of ["downloads", "fix", "seer"]) {
+    assert.ok(/<span class="status-badge busch-chip [a-z]+" data-tone="(?:success|warning|error)"/.test(parts[where]) ||
+      /<span class="status-badge busch-chip [a-z]+"/.test(parts[where]), `${where}: status chip`);
+  }
+  assert.ok(/<span class="status-badge busch-chip error" data-tone="error"/.test(parts.downloads), "blocked import carries the error tone");
+  assert.ok(/class="busch-notice" data-tone="info" role="status"/.test(parts.downloads), "downloads message");
+  assert.ok(/class="busch-notice" data-tone="info" role="status"/.test(parts.fix), "fix message");
+  assert.ok(/class="busch-notice" data-tone="info" role="status"/.test(parts.seer), "seer message");
+  for (const where of ["downloads", "fix", "seer"]) assert.ok(/class="busch-notice" data-tone="error" role="alert"/.test(parts[where]), `${where}: error notice`);
+  assert.ok(/<span class="busch-chip"><span class="lbl">/.test(parts.fix), "page and selection counters are chips");
+  assert.ok(!/class="(?:[^"]* )?(?:notice|chip)(?: [^"]*)?"/.test(Object.values(parts).join("")), "no own notice/chip class left");
+});
+
+test("M62: the bundle keeps no own button, chip or notice variants in its CSS", () => {
+  assert.ok(!/^\s*button\s*[{:,[]/m.test(OWN), "no generic button rule");
+  assert.ok(!/button\.(?:quiet|primary|danger)\b/.test(OWN), "no button.quiet/primary/danger");
+  assert.ok(!/\.(?:notice|chip)\s*[{,.]/.test(OWN.replace(/busch-(?:notice|chip)/g, "")), "no own .notice/.chip rules");
+  assert.ok(!/\.status-badge\.(?:success|warning|error|unavailable)\s*\{/.test(OWN), "no own status colours");
+});

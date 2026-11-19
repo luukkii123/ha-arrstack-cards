@@ -421,6 +421,7 @@ const ARR_ICON_PATHS = {
   pause: '<rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>',
   listPlus: '<path d="M11 12H3"/><path d="M16 6H3"/><path d="M16 18H3"/><path d="M18 9v6"/><path d="M21 12h-6"/>',
   close: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+  info: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>',
   jellyfish:
     '<path d="M4 12a8 8 0 0 1 16 0"/><path d="M4 12h16"/>' +
     '<path d="M7.5 12c0 2.5-1.5 3.5-1.5 5.5S7 20 7 20"/>' +
@@ -1065,7 +1066,7 @@ const ARRSTACK_TOKENS = `
  */
 const ARRSTACK_EINZEILIG = `
   .title, .head-meta, .row-title, .row-meta, .row-side .lead, .row-side .sub,
-  .chip, .lbl, .dlg-title {
+  .lbl, .dlg-title {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -1118,6 +1119,7 @@ const ARRSTACK_GEMEINSAM = `
     flex: 0 1 auto;
   }
   .head-meta.status-badge { max-width: 100%; }
+  .head-meta.busch-chip { color: var(--arr-text); }
   /* Das echte Logo des Dienstes — es sagt auf einen Blick, ob die Karte auf
      Radarr, Sonarr, SABnzbd oder Jellyseerr schaut. */
   .logo { flex: none; border-radius: var(--arr-radius-1); object-fit: contain; }
@@ -1216,45 +1218,18 @@ const ARRSTACK_GEMEINSAM = `
     transition: width 0.4s ease;
   }
 
-  /* Genau eine gefüllte Akzentfläche je Ansicht: der primäre Knopf. */
-  button {
-    font: inherit;
-    font-size: var(--arr-font-sm);
-    display: inline-flex;
-    align-items: center;
-    gap: var(--arr-space-1);
-    padding: var(--arr-space-2) var(--arr-space-3);
-    border: none;
-    border-radius: var(--arr-radius-1);
-    background: none;
-    color: var(--arr-accent);
-    cursor: pointer;
-    min-height: 44px;
-    min-width: 0;
-    max-width: 100%;
+  /* Knöpfe, Chips und Hinweise sind die Grundbausteine aus Shared UI (M62):
+     .busch-btn (secondary, primary, destructive), .busch-chip, .busch-notice.
+     Genau eine gefüllte Akzentfläche je Ansicht: der primäre Knopf. Hier steht
+     nur, was die Familie dazu festlegt: Schriftstufe, Hover, Abstand. */
+  .busch-btn { font-size: var(--arr-font-md); }
+  .busch-btn .icon { flex: none; }
+  .busch-btn:is(:not([data-variant]), [data-variant=secondary], [data-variant=destructive]:not([data-filled])):hover:not(:disabled) {
+    background: var(--arr-surface);
   }
-  button .icon { flex: none; }
-  button:focus-visible, .row.result:focus-visible, .search input:focus-visible {
+  .row.result:focus-visible, .search input:focus-visible {
     outline: 2px solid var(--arr-accent);
     outline-offset: 2px;
-  }
-  button:hover { background: var(--arr-surface); }
-  button[disabled] { color: var(--arr-muted); cursor: default; }
-  button.primary {
-    background: var(--arr-accent);
-    color: var(--text-primary-color, #fff);
-    font-weight: var(--arr-weight-bold);
-  }
-  button.primary[disabled] {
-    background: var(--arr-line);
-    color: var(--arr-muted);
-  }
-  button.quiet { color: var(--arr-muted); }
-  /* Endgültige Aktionen sind rot (Design Gallery, Remove/Delete). */
-  button.danger { color: var(--arr-danger); }
-  button.danger.primary {
-    background: var(--arr-danger);
-    color: var(--text-primary-color, #fff);
   }
 
   .actions {
@@ -1269,44 +1244,16 @@ const ARRSTACK_GEMEINSAM = `
   /* Laden, Leer, Fehler: BuschUI.stateBlock (M27), dieselbe Form in allen Kartenfamilien. */
   .busch-state details { align-self: stretch; text-align: start; }
 
-  .notice {
-    font-size: var(--arr-font-sm);
-    color: var(--arr-muted);
-    padding: var(--arr-space-2);
-    border-radius: var(--arr-radius-1);
-    background: var(--arr-surface);
-    overflow-wrap: anywhere;
-  }
-  .notice.problem { color: var(--arr-danger); }
-  .notice + .rows, .notice + .busch-state { margin-top: var(--arr-space-3); }
+  .busch-notice .notice-heading { font-weight: var(--busch-font-weight-medium, 500); }
+  /* Technische Details: Zeile mit 44 px Ziel, Rohtext bricht um statt zu ragen. */
+  summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; }
+  pre { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; user-select: text; }
+  .busch-notice details { margin-top: var(--arr-space-1); }
+  .busch-notice + .rows, .busch-notice + .busch-state, .busch-notice + .queue-table,
+  .busch-notice + .busch-notice { margin-top: var(--arr-space-3); }
 
-  .chip {
-    font-size: var(--arr-font-sm);
-    padding: var(--arr-space-1) var(--arr-space-2);
-    border-radius: var(--arr-radius-2);
-    background: var(--arr-surface);
-    color: var(--arr-muted);
-    flex: 0 1 auto;
-  }
-  .status-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--arr-space-1);
-    max-width: 100%;
-    min-width: 0;
-    padding: var(--arr-space-1) var(--arr-space-2);
-    border-radius: var(--arr-radius-2);
-    background: var(--arr-surface);
-    color: var(--arr-muted);
-    font-size: var(--arr-font-sm);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .status-badge.success { color: var(--arr-success); background: color-mix(in srgb, var(--arr-success) 12%, transparent); }
-  .status-badge.warning { color: var(--arr-warning); background: color-mix(in srgb, var(--arr-warning) 12%, transparent); }
-  .status-badge.error { color: var(--arr-danger); background: color-mix(in srgb, var(--arr-danger) 12%, transparent); }
-  .status-badge.unavailable { color: var(--arr-danger); }
+  /* Status als Chip: Bedeutung über Tönung (data-tone), Text in der Textfarbe. */
+  .status-badge { flex: 0 1 auto; }
 
 `;
 
@@ -1335,18 +1282,12 @@ const ARRSTACK_COMPACT = `
     gap: var(--arr-space-2);
     margin-top: var(--arr-space-3);
   }
-  .season {
-    font-size: var(--arr-font-sm);
-    padding: var(--arr-space-1) var(--arr-space-3);
-    border-radius: var(--arr-radius-2);
-    background: var(--arr-surface);
-    color: var(--arr-muted);
-  }
-  /* Gewählte Staffeln sind ein Zustand, keine zweite Hauptaktion: getönt
-     statt gefüllt. Gefüllt bleibt allein der Anfragen-Knopf. */
+  /* Staffeln sind Chips (button.busch-chip, 44 px). Gewählte Staffeln sind
+     ein Zustand, keine zweite Hauptaktion: getönt statt gefüllt. Gefüllt
+     bleibt allein der Anfragen-Knopf. */
+  .season { padding: 0 var(--arr-space-3); }
   .season[aria-pressed="true"] {
     background: color-mix(in srgb, var(--arr-accent) 18%, transparent);
-    color: var(--arr-accent);
     font-weight: var(--arr-weight-bold);
   }
   .season[disabled] { cursor: default; opacity: 0.55; }
@@ -1354,15 +1295,14 @@ const ARRSTACK_COMPACT = `
 
   .head { margin-bottom: var(--arr-space-3); }
   .title { font-size: var(--arr-font-md); }
-  .status-badge, .status-badge.success, .status-badge.warning, .status-badge.error,
-  .notice, .notice.problem, details summary, button.quiet { color: var(--arr-text); }
+  details summary { color: var(--arr-text); }
   .head-media { width: 44px; height: 44px; }
   .poster { width: var(--arr-thumb); height: calc(var(--arr-thumb) * 1.5); }
   .row.result { display: grid; grid-template-columns: auto minmax(0,1fr); gap: var(--arr-space-2); }
   .row.result > .status-badge { grid-column: 2; justify-self: start; margin-top: calc(-1 * var(--arr-space-2)); }
   .import-row { display: grid; grid-template-columns: auto minmax(0,1fr); gap: var(--arr-space-2); }
   .import-row > .actions { grid-column: 2; width: auto; }
-  .import-row .status-badge { margin-top: var(--arr-space-2); white-space: normal; overflow-wrap: anywhere; }
+  .import-row .status-badge { margin-top: var(--arr-space-2); }
   .import-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--arr-space-2); margin: var(--arr-space-3) 0; }
   .select-label { display: inline-flex; align-items: center; gap: var(--arr-space-2); min-height: 44px; cursor: pointer; }
   input[type=checkbox], input[type=radio] { accent-color: var(--arr-accent); }
@@ -1371,7 +1311,6 @@ const ARRSTACK_COMPACT = `
   .candidate + .candidate { margin-top: var(--arr-space-3); }
   details { overflow-wrap: anywhere; min-width: 0; font-size: var(--arr-font-sm); }
   summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; color: var(--arr-muted); }
-  pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; user-select: text; }
   @container (max-width: 440px) {
     .head { grid-template-columns: minmax(0,1fr) auto; }
     .head-meta { grid-column: auto; margin-inline-start: 0; }
@@ -1633,7 +1572,7 @@ class ArrstackDialog extends HTMLElement {
       <div class="sheet ${model.schmal ? "schmal" : ""} ${model.kompakt ? "kompakt" : ""}" role="dialog" aria-modal="true"
         aria-label="${escapeHtml(model.titel)}">
         <div class="dlg-head">
-          <button class="dlg-close" aria-label="${escapeHtml(model.schliessen)}"
+          <button class="dlg-close busch-btn" aria-label="${escapeHtml(model.schliessen)}"
             title="${escapeHtml(model.schliessen)}">${arrIcon("close", 20)}</button>
           <div class="dlg-title">${escapeHtml(model.titel)}</div>
         </div>
@@ -1644,7 +1583,7 @@ class ArrstackDialog extends HTMLElement {
           aktionen.length
             ? `<div class="dlg-foot">${aktionen
                 .map(
-                  (aktion) => `<button class="${aktion.art || "quiet"}"
+                  (aktion) => `<button ${buttonKind(aktion.art)}
                     data-akt="${escapeHtml(aktion.id)}" ${aktion.aus ? "disabled" : ""}>
                     ${aktion.icon ? arrIcon(aktion.icon) : ""}
                     <span class="lbl">${escapeHtml(aktion.text)}</span>
@@ -1943,9 +1882,9 @@ class ArrstackCardBase extends HTMLElement {
   /** An error next to content (operation, dialog, draft): a notice, the view stays. */
   _errorMarkup(error, heading) {
     const t = this._t();
-    return `<div class="notice problem" role="alert"><div>${escapeHtml(heading || t.fehler_allgemein)}</div>
+    return noticeMarkup("error", `<div class="notice-heading">${escapeHtml(heading || t.fehler_allgemein)}</div>
       <div>${escapeHtml(this._errorHint(error))}</div>
-      <details><summary>${escapeHtml(t.details)}</summary><pre>${escapeHtml(error?.message || String(error || ""))}</pre></details></div>`;
+      <details><summary>${escapeHtml(t.details)}</summary><pre>${escapeHtml(error?.message || String(error || ""))}</pre></details>`);
   }
 
   /**
@@ -2004,7 +1943,7 @@ class ArrstackCardBase extends HTMLElement {
         <span class="head-media">${serviceSymbol(this._data?.brand || this._data?.service || this._config?.service, icon, 24)}</span>
         <span class="title">${escapeHtml(this._titel())}</span>
       </div>
-      ${meta ? `<span class="head-meta${tone ? ` status-badge ${tone}` : ""}">${escapeHtml(meta)}</span>` : ""}`;
+      ${meta ? (tone ? statusChip(tone, meta, " head-meta") : `<span class="head-meta">${escapeHtml(meta)}</span>`) : ""}`;
     return BuschUI.header({node,titleNode:node.querySelector('.title')}).outerHTML;
   }
 
@@ -2054,6 +1993,29 @@ function seerTone(status) {
   if (value === "blocklisted") return BuschUI.statusSemantic("error");
   if (value === "pending" || value === "deleted") return BuschUI.statusSemantic("neutral");
   return BuschUI.statusSemantic("unknown");
+}
+
+/** Status semantics → tone of the shared chip (M62); neutral and unknown stay untinted. */
+const ARR_CHIP_TONES = { success: "success", warning: "warning", error: "error", unavailable: "error" };
+
+/** A status as BuschUI chip: tint carries the meaning, the text keeps the text colour (M62, M26). */
+function statusChip(tone, text, extra = "") {
+  const chipTone = ARR_CHIP_TONES[tone];
+  return `<span class="status-badge busch-chip${extra} ${tone}"${chipTone ? ` data-tone="${chipTone}"` : ""} title="${escapeHtml(text)}"><span class="lbl">${escapeHtml(text)}</span></span>`;
+}
+
+const ARR_NOTICE_ICONS = { info: "info", warning: "alert", error: "alert" };
+
+/** A message as BuschUI notice (M62). `inner` is markup whose texts are already escaped. */
+function noticeMarkup(tone, inner) {
+  return `<div class="busch-notice" data-tone="${tone}" role="${tone === "error" ? "alert" : "status"}"><span class="busch-notice-icon">${arrIcon(ARR_NOTICE_ICONS[tone], 20)}</span><div class="busch-notice-text">${inner}</div></div>`;
+}
+
+/** Button kind of a dialog or draft action → class and variant of the shared button (M62). */
+function buttonKind(art) {
+  if (art === "primary") return 'class="busch-btn" data-variant="primary"';
+  if (art === "destructive") return 'class="busch-btn" data-variant="destructive" data-filled';
+  return 'class="busch-btn" data-variant="secondary"';
 }
 
 /** Platzhalter der Form `{n}` füllen. */
@@ -2315,10 +2277,10 @@ class ArrstackDownloadsEditor extends ArrstackCardEditor {
     const columns=queueColumns(this._config.columns),t=this._woerterbuch[this._sprache()].texte;
     const order=columns.map(key=>queueColumnLabel(key,this._sprache())).join(' · ');
     this._orderHint.textContent=t.spalten_keine.replace('{spalten}',order);
-    this._order.innerHTML=`<summary><span>${escapeHtml(t.spaltenreihenfolge)}</span><small class="queue-order-summary">${escapeHtml(order)}</small></summary><div role="status" aria-live="polite" class="queue-order-status">${escapeHtml(order)}</div>${columns.map((key,index)=>`<div class="queue-order-row"><span>${escapeHtml(queueColumnLabel(key,this._sprache()))}</span><button type="button" data-column="${key}" data-move="-1" aria-label="${escapeHtml(`${queueColumnLabel(key,this._sprache())} ${t.nach_oben}`)}" ${index===0 ? 'disabled' : ''}>${escapeHtml(t.hoch)}</button><button type="button" data-column="${key}" data-move="1" aria-label="${escapeHtml(`${queueColumnLabel(key,this._sprache())} ${t.nach_unten}`)}" ${index===columns.length-1 ? 'disabled' : ''}>${escapeHtml(t.runter)}</button></div>`).join('')}`;
+    this._order.innerHTML=`<summary><span>${escapeHtml(t.spaltenreihenfolge)}</span><small class="queue-order-summary">${escapeHtml(order)}</small></summary><div role="status" aria-live="polite" class="queue-order-status">${escapeHtml(order)}</div>${columns.map((key,index)=>`<div class="queue-order-row"><span>${escapeHtml(queueColumnLabel(key,this._sprache()))}</span><button type="button" class="busch-btn" data-variant="secondary" data-column="${key}" data-move="-1" aria-label="${escapeHtml(`${queueColumnLabel(key,this._sprache())} ${t.nach_oben}`)}" ${index===0 ? 'disabled' : ''}>${escapeHtml(t.hoch)}</button><button type="button" class="busch-btn" data-variant="secondary" data-column="${key}" data-move="1" aria-label="${escapeHtml(`${queueColumnLabel(key,this._sprache())} ${t.nach_unten}`)}" ${index===columns.length-1 ? 'disabled' : ''}>${escapeHtml(t.runter)}</button></div>`).join('')}`;
     this._order.querySelectorAll?.('button').forEach(button=>button.addEventListener('click',()=>this._moveColumn(button.dataset.column,Number(button.dataset.move))));
     if (key) Array.from(this._order.querySelectorAll('button')).find(button=>button.dataset.column===key && button.dataset.move===move)?.focus();
-    if (!this._orderStyle) {this._orderStyle=document.createElement('style');this._orderStyle.textContent=`.queue-column-order{margin-top:var(--ha-space-4,24px);color:var(--primary-text-color)}.queue-column-order summary{cursor:pointer;min-height:44px;display:flex;flex-direction:column;justify-content:center;min-width:0}.queue-order-summary,.queue-order-hint{font-size:var(--ha-font-size-s,0.8125rem);color:var(--secondary-text-color);overflow-wrap:anywhere}.queue-column-order[open] .queue-order-summary{display:none}.queue-order-hint{margin:var(--ha-space-4,24px) 0 0}.queue-order-status{font-size:var(--ha-font-size-s,0.8125rem);overflow-wrap:anywhere;margin-bottom:var(--ha-space-2,8px)}.queue-order-row{display:flex;align-items:center;gap:var(--ha-space-2,8px)}.queue-order-row span{flex:1;min-width:0;overflow-wrap:anywhere}.queue-order-row button{font:inherit;min-height:44px;min-width:44px;padding:var(--ha-space-2,8px);border:0;border-radius:var(--ha-card-border-radius,12px);background:none;color:var(--primary-text-color);cursor:pointer}.queue-order-row button:disabled{color:var(--secondary-text-color);cursor:default}.queue-order-row button:focus-visible{outline:2px solid var(--primary-color)}`;this.appendChild(this._orderStyle);}
+    if (!this._orderStyle) {this._orderStyle=document.createElement('style');this._orderStyle.textContent=`.queue-column-order{margin-top:var(--ha-space-4,24px);color:var(--primary-text-color)}.queue-column-order summary{cursor:pointer;min-height:44px;display:flex;flex-direction:column;justify-content:center;min-width:0}.queue-order-summary,.queue-order-hint{font-size:var(--ha-font-size-s,0.8125rem);color:var(--secondary-text-color);overflow-wrap:anywhere}.queue-column-order[open] .queue-order-summary{display:none}.queue-order-hint{margin:var(--ha-space-4,24px) 0 0}.queue-order-status{font-size:var(--ha-font-size-s,0.8125rem);overflow-wrap:anywhere;margin-bottom:var(--ha-space-2,8px)}.queue-order-row{display:flex;align-items:center;gap:var(--ha-space-2,8px)}.queue-order-row span{flex:1;min-width:0;overflow-wrap:anywhere}`;this.appendChild(this._orderStyle);}
   }
 }
 
@@ -2339,7 +2301,7 @@ class ArrstackImportCardBase extends ArrstackCardBase {
 
   _importErrorMarkup(error,heading) {
     const details=error?.details;
-    return `<div class="notice problem" role="alert"><div>${escapeHtml(heading || this._t().import_fehler)}</div><div>${escapeHtml(error?.message || this._t().fehler_kurz)}</div>${details ? `<details><summary>${escapeHtml(this._t().details)}</summary><pre>${escapeHtml(typeof details==='string' ? details : JSON.stringify(details,null,2))}</pre></details>` : ''}</div>`;
+    return noticeMarkup("error", `<div class="notice-heading">${escapeHtml(heading || this._t().import_fehler)}</div><div>${escapeHtml(error?.message || this._t().fehler_kurz)}</div>${details ? `<details><summary>${escapeHtml(this._t().details)}</summary><pre>${escapeHtml(typeof details==='string' ? details : JSON.stringify(details,null,2))}</pre></details>` : ''}`);
   }
 
   _stateLabel(item) {
@@ -2533,11 +2495,8 @@ const ARRSTACK_DOWNLOADS_STYLES = `
   .queue-progress .bar { width:100%; }
   .queue-action { align-self:start; }
   .queue-action button { width:var(--queue-action); min-width:var(--queue-action); height:var(--queue-action); padding:0; justify-content:center; color:var(--arr-text); }
-  .queue-action button:hover { color:var(--arr-accent); }
-  .queue-action button[disabled] { color:var(--arr-muted); }
   .queue-reasons { grid-column:1 / -1; margin:0; }
-  .queue-reasons .notice { padding:0; background:none; }
-  .queue-reasons .notice + .notice { margin-top:var(--arr-space-2); }
+  .queue-reasons .busch-notice + .busch-notice, .queue-reasons .busch-notice + .queue-message { margin-top:var(--arr-space-2); }
   .queue-reasons p { margin:0; overflow-wrap:anywhere; color:var(--arr-muted); font-size:var(--arr-font-sm); }
   .queue-message summary { min-height:44px;display:flex;align-items:center;gap:var(--arr-space-2);cursor:pointer;color:var(--arr-muted);font-size:var(--arr-font-sm); }
   .queue-message summary:focus-visible { outline:2px solid var(--arr-accent);outline-offset:2px; }
@@ -2575,7 +2534,6 @@ const ARRSTACK_DOWNLOADS_STYLES = `
     .queue-table:not(.expanded) .queue-cell .queue-value { white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0; }
     .queue-table:not(.expanded) .queue-progress { display:flex;align-items:center;gap:var(--arr-space-2);width:100%; }
     .queue-table:not(.expanded) .queue-progress .bar { flex:1;min-width:0;margin-top:0; }
-    .queue-table:not(.expanded) .status-badge { padding:0;background:none;white-space:normal;overflow-wrap:anywhere; }
   }
 `;
 
@@ -2615,7 +2573,7 @@ class ArrstackDownloadsCard extends ArrstackImportCardBase {
     patchQueueMarkup(this.shadowRoot, `<style>${ARRSTACK_STYLES}${ARRSTACK_DOWNLOADS_STYLES}</style>
       <ha-card>
         ${this._head("download", this._headMeta())}
-        ${this._message ? `<div class="notice" role="status">${escapeHtml(this._message)}</div>` : ""}
+        ${this._message ? noticeMarkup("info", escapeHtml(this._message)) : ""}
         ${this._operationError ? this._errorMarkup(this._operationError,this._t().import_fehler) : ""}
         ${this._body()}
       </ha-card>`);
@@ -2665,7 +2623,7 @@ class ArrstackDownloadsCard extends ArrstackImportCardBase {
     return `<div role="table" aria-label="${escapeHtml(t.kartentitel)}" class="queue-table${columns.length>6 ? ' expanded' : ''}${this._config.show_posters ? '' : ' no-posters'}" style="--queue-columns:${widths.join(' ')};${this._config.show_posters ? '' : '--queue-poster:0px;'}">
       <div class="queue-grid queue-header" role="row">${this._config.show_posters ? `<span role="columnheader" aria-label="${escapeHtml(t.poster)}"></span>` : ''}${columns.map(key=>`<span role="columnheader" class="queue-cell" data-column="${key}">${escapeHtml(queueColumnLabel(key,this._sprache()))}</span>`).join('')}<span role="columnheader" aria-label="${escapeHtml(t.aktionen)}"></span></div>
       ${items.slice(this._page*pageSize,(this._page+1)*pageSize).map(item=>this._row(item)).join('')}</div>
-      ${pages>1 ? `<div class="queue-pages"><button class="quiet" data-page="-1" ${this._page===0 || this._busy ? 'disabled' : ''}>${escapeHtml(t.vorherige)}</button><span class="queue-page-label" role="status">${escapeHtml(pageLabel)} · ${items.length}</span><button class="quiet" data-page="1" ${this._page===pages-1 || this._busy ? 'disabled' : ''}>${escapeHtml(t.naechste)}</button></div>` : ''}`;
+      ${pages>1 ? `<div class="queue-pages"><button class="busch-btn" data-variant="secondary" data-page="-1" ${this._page===0 || this._busy ? 'disabled' : ''}>${escapeHtml(t.vorherige)}</button><span class="queue-page-label" role="status">${escapeHtml(pageLabel)} · ${items.length}</span><button class="busch-btn" data-variant="secondary" data-page="1" ${this._page===pages-1 || this._busy ? 'disabled' : ''}>${escapeHtml(t.naechste)}</button></div>` : ''}`;
   }
 
   _canInspect(item) {
@@ -2685,7 +2643,7 @@ class ArrstackDownloadsCard extends ArrstackImportCardBase {
       let value=values[key];
       if (Array.isArray(value)) value=value.join(' · ');
       let markup;
-      if (key==='status') markup=`<span class="status-badge ${queueTone(item)}">${escapeHtml(queueStatusText(item,t) || '—')}</span>`;
+      if (key==='status') markup=statusChip(queueTone(item),queueStatusText(item,t) || '—');
       else if (key==='progress') markup=`<div class="queue-progress"><span>${Math.round(progress)} %</span><div class="bar" role="progressbar" aria-label="${escapeHtml(queueColumnLabel(key,this._sprache()))}" aria-valuenow="${progress}" aria-valuemin="0" aria-valuemax="100"><i style="width:${progress}%"></i></div></div>`;
       else markup=`<span class="queue-value" title="${escapeHtml(value ?? '')}">${escapeHtml(value==null || value==='' ? '—' : value)}</span>`;
       // M58: no aria-label on a cell, it would replace the value; the column header names it.
@@ -2696,7 +2654,7 @@ class ArrstackDownloadsCard extends ArrstackImportCardBase {
     return `<div role="row" class="queue-grid queue-row" data-item="${this._id(item)}">
       ${this._config.show_posters ? `<div role="cell" class="queue-poster">${posterMarkup(item.poster,this._data?.brand,'download')}</div>` : ''}
       <div class="queue-fields">${cells}</div>
-      <div role="cell" class="queue-action">${this._canInspect(item) ? `<button class="act-check quiet" title="${escapeHtml(t.dialog_pruefen)}" aria-label="${escapeHtml(`${t.dialog_pruefen}: ${title}`)}" ${this._busy ? 'disabled' : ''}>${arrIcon('search')}</button>` : ''}</div>
+      <div role="cell" class="queue-action">${this._canInspect(item) ? `<button class="act-check busch-btn" title="${escapeHtml(t.dialog_pruefen)}" aria-label="${escapeHtml(`${t.dialog_pruefen}: ${title}`)}" ${this._busy ? 'disabled' : ''}>${arrIcon('search')}</button>` : ''}</div>
       ${problem || reasons.length ? `<div role="cell" class="queue-reasons">${problem ? this._importErrorMarkup(problem,t.import_fehler) : ''}${reasons.length ? `<details class="queue-message"><summary>${arrIcon("alert")}<span>${escapeHtml(t.import_hinweise)} (${reasons.length})</span></summary>${reasons.map(reason=>`<p>${escapeHtml(reason)}</p>`).join('')}</details>` : ''}</div>` : ''}
     </div>`;
   }
@@ -2866,18 +2824,18 @@ class ArrstackFixCard extends ArrstackImportCardBase {
     const visible = items.slice(this._page*pageSize,(this._page+1)*pageSize);
     patchQueueMarkup(this.shadowRoot, `<style>${ARRSTACK_STYLES}${ARRSTACK_COMPACT}</style><ha-card>
       ${this._head("download", items.length ? fuelle(t.offen, {n:items.length}) : "", "warning")}
-      ${this._message ? `<div class="notice" role="status">${escapeHtml(this._message)}</div>` : ""}
+      ${this._message ? noticeMarkup("info", escapeHtml(this._message)) : ""}
       ${this._operationError ? this._errorMarkup(this._operationError,t.import_fehler) : ""}
       ${this._body(visible)}
       ${pages > 1 ? `<div class="import-toolbar">
-        <button class="act-prev quiet" ${this._page===0 ? "disabled" : ""}>${escapeHtml(t.vorherige)}</button>
-        <span class="chip">${escapeHtml(fuelle(t.seite,{n:this._page+1,total:pages}))}</span>
-        <button class="act-next quiet" ${this._page===pages-1 ? "disabled" : ""}>${escapeHtml(t.naechste)}</button>
+        <button class="act-prev busch-btn" data-variant="secondary" ${this._page===0 ? "disabled" : ""}>${escapeHtml(t.vorherige)}</button>
+        <span class="busch-chip"><span class="lbl">${escapeHtml(fuelle(t.seite,{n:this._page+1,total:pages}))}</span></span>
+        <button class="act-next busch-btn" data-variant="secondary" ${this._page===pages-1 ? "disabled" : ""}>${escapeHtml(t.naechste)}</button>
       </div>` : ""}
       ${items.length ? `<div class="import-toolbar">
-        <button class="act-bulk quiet" ${this._busy || !ready.length ? "disabled" : ""}>${arrIcon("download")}<span class="lbl">${escapeHtml(t.bulk)}</span></button>
-        <button class="act-refresh quiet" ${this._loading || this._busy ? "disabled" : ""}>${escapeHtml(t.neu_laden)}</button>
-        ${this._selected.size ? `<span class="chip">${escapeHtml(fuelle(t.ausgewaehlt,{n:this._selected.size}))}</span><button class="act-selected quiet" ${this._busy ? "disabled" : ""}>${escapeHtml(t.auswahl_importieren)}</button>` : ""}
+        <button class="act-bulk busch-btn" data-variant="secondary" ${this._busy || !ready.length ? "disabled" : ""}>${arrIcon("download")}<span class="lbl">${escapeHtml(t.bulk)}</span></button>
+        <button class="act-refresh busch-btn" data-variant="secondary" ${this._loading || this._busy ? "disabled" : ""}>${escapeHtml(t.neu_laden)}</button>
+        ${this._selected.size ? `<span class="busch-chip"><span class="lbl">${escapeHtml(fuelle(t.ausgewaehlt,{n:this._selected.size}))}</span></span><button class="act-selected busch-btn" data-variant="secondary" ${this._busy ? "disabled" : ""}>${escapeHtml(t.auswahl_importieren)}</button>` : ""}
       </div>` : ""}</ha-card>`);
     this._bind();
   }
@@ -2899,13 +2857,13 @@ class ArrstackFixCard extends ArrstackImportCardBase {
         <div class="row-title">${escapeHtml(item.parent_title || item.title || "")}</div>
         <div class="row-meta">${escapeHtml(item.episode || item.title || "")}</div>
         <div class="bar" role="progressbar" aria-valuenow="${Math.max(0,Math.min(100,Number(item.progress)||0))}" aria-valuemin="0" aria-valuemax="100" aria-label="${escapeHtml(t.fortschritt || t.kartentitel)}"><i style="width:${Math.max(0,Math.min(100,Number(item.progress)||0))}%"></i></div>
-        <span class="status-badge ${complete ? (ready ? "success" : "warning") : queueTone(item)}">${escapeHtml(`${Math.round(Number(item.progress)||0)} % · ${status}`)}</span>
+        ${statusChip(complete ? (ready ? "success" : "warning") : queueTone(item), `${Math.round(Number(item.progress)||0)} % · ${status}`)}
         ${problem ? this._importErrorMarkup(problem,t.import_fehler) : ""}
       </div>
       <div class="actions">
-        ${ready ? `<label class="select-label"><input type="checkbox" class="item-select" aria-label="${escapeHtml(`${t.auswahl_importieren}: ${item.parent_title || item.title}`)}" ${this._selected.has(id) ? "checked" : ""} ${this._busy ? "disabled" : ""}></label><button class="act-import quiet" ${this._busy ? "disabled" : ""}>${escapeHtml(t.importieren)}</button>` : ""}
-        ${complete ? `<button class="act-check quiet" ${this._busy ? "disabled" : ""}>${escapeHtml(item.import_state === "selection_required" ? t.auswahl_datei : t.pruefen)}</button>` : ""}
-        <button class="act-delete danger" ${this._busy ? "disabled" : ""}>${escapeHtml(t.loeschen)}</button>
+        ${ready ? `<label class="select-label"><input type="checkbox" class="item-select" aria-label="${escapeHtml(`${t.auswahl_importieren}: ${item.parent_title || item.title}`)}" ${this._selected.has(id) ? "checked" : ""} ${this._busy ? "disabled" : ""}></label><button class="act-import busch-btn" data-variant="secondary" ${this._busy ? "disabled" : ""}>${escapeHtml(t.importieren)}</button>` : ""}
+        ${complete ? `<button class="act-check busch-btn" data-variant="secondary" ${this._busy ? "disabled" : ""}>${escapeHtml(item.import_state === "selection_required" ? t.auswahl_datei : t.pruefen)}</button>` : ""}
+        <button class="act-delete busch-btn" data-variant="destructive" ${this._busy ? "disabled" : ""}>${escapeHtml(t.loeschen)}</button>
       </div>
     </div>`;
   }
@@ -2947,7 +2905,7 @@ class ArrstackFixCard extends ArrstackImportCardBase {
     const t = this._t();
     this._oeffneDialog({titel:t.dialog_loeschen,schliessen:t.schliessen,schmal:true,
       koerper:()=>`<div class="dlg-text">${escapeHtml(t.loeschen_frage)}</div><div class="dlg-sub">${escapeHtml(titel)}</div>`,
-      aktionen:[{id:"cancel",text:t.abbrechen,art:"quiet"},{id:"delete",text:t.loeschen,art:"danger primary",icon:"trash"}],
+      aktionen:[{id:"cancel",text:t.abbrechen,art:"quiet"},{id:"delete",text:t.loeschen,art:"destructive",icon:"trash"}],
       beiAktion:(id,dlg)=>{dlg.close();if(id==="delete")this._delete(itemId);}});
   }
 
@@ -3031,7 +2989,7 @@ class ArrstackSeerCard extends ArrstackCardBase {
         border-radius: var(--arr-radius-1);
         background: var(--arr-surface);
       }
-      .search .go { flex: 0 0 44px; width: 44px; justify-content: center; padding: 0; }
+      .search .go { flex: 0 0 44px; width: 44px; display: inline-flex; align-items: center; justify-content: center; padding: 0; }
       .row.result { cursor: pointer; min-height: 66px; }
       .request-inline { padding: var(--arr-space-3); background: var(--arr-surface); }
       .inline-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--arr-space-2); margin-top: var(--arr-space-3); }
@@ -3041,10 +2999,10 @@ class ArrstackSeerCard extends ArrstackCardBase {
         <div class="search">
           <input type="search" placeholder="${escapeHtml(t.platzhalter)}"
             value="${escapeHtml(this._query)}" aria-label="${escapeHtml(t.suchbegriff)}" ${this._show ? "disabled" : ""}>
-          <button class="go quiet" aria-label="${escapeHtml(t.suchen)}"
+          <button class="go busch-ui-action" data-variant="icon-only" aria-label="${escapeHtml(t.suchen)}"
             title="${escapeHtml(t.suchen)}" ${this._searching || this._opening || this._show ? "disabled" : ""}>${arrIcon("search")}</button>
         </div>
-        ${this._message ? `<div class="notice">${escapeHtml(this._message)}</div>` : ""}
+        ${this._message ? noticeMarkup("info", escapeHtml(this._message)) : ""}
         ${this._body()}
       </ha-card>`;
     bindImageFallbacks(this.shadowRoot);
@@ -3081,7 +3039,7 @@ class ArrstackSeerCard extends ArrstackCardBase {
                 .join(" · ")
             )}</div>
           </div>
-          <span class="status-badge ${seerTone(item.status)}">${escapeHtml(statusLabel(item.status, t))}</span>
+          ${statusChip(seerTone(item.status), statusLabel(item.status, t))}
         </div>${this._show?.id === item.id && this._show?.media_type === item.media_type ? this._inlineMarkup() : ""}`
       )
       .join("")}</div>`;
@@ -3099,7 +3057,7 @@ class ArrstackSeerCard extends ArrstackCardBase {
         const pressed = this._selected.has(season.season);
         const label =
           season.season === 0 ? t.specials : fuelle(t.staffel, { n: season.season });
-        return `<button class="season" data-season="${season.season}"
+        return `<button class="season busch-chip" data-season="${season.season}"
           aria-pressed="${pressed}" ${available || this._busy ? "disabled" : ""}
           title="${escapeHtml(available ? fuelle(t.staffel_da, { name: label }) : label)}">
           <span class="lbl">${escapeHtml(label)}</span>${available ? arrIcon("check", 14) : ""}
@@ -3145,12 +3103,12 @@ class ArrstackSeerCard extends ArrstackCardBase {
   _inlineMarkup() {
     const t = this._t();
     if (this._discardInline) return `<section class="request-inline" aria-label="${escapeHtml(t.aenderungen)}">
-      <div class="notice">${escapeHtml(t.aenderungen_hinweis)}</div>
-      <div class="inline-actions"><button class="quiet" data-inline-action="keep">${escapeHtml(t.behalten)}</button>
-      <button class="quiet" data-inline-action="discard">${escapeHtml(t.verwerfen)}</button></div></section>`;
+      ${noticeMarkup("info", escapeHtml(t.aenderungen_hinweis))}
+      <div class="inline-actions"><button ${buttonKind("quiet")} data-inline-action="keep">${escapeHtml(t.behalten)}</button>
+      <button ${buttonKind("primary")} data-inline-action="discard">${escapeHtml(t.verwerfen)}</button></div></section>`;
     return `<section class="request-inline" aria-label="${escapeHtml(t.dialog_anfragen)}">
       ${this._dialogKoerper()}<div class="inline-actions">${this._dialogAktionen().map(action=>
-        `<button class="${action.art}" data-inline-action="${action.id}" ${action.aus ? "disabled" : ""}>${escapeHtml(action.text)}</button>`).join("")}</div></section>`;
+        `<button ${buttonKind(action.art)} data-inline-action="${action.id}" ${action.aus ? "disabled" : ""}>${escapeHtml(action.text)}</button>`).join("")}</div></section>`;
   }
 
   _bind() {
@@ -3177,7 +3135,7 @@ class ArrstackSeerCard extends ArrstackCardBase {
     }
     this.shadowRoot.querySelector(".act-retry")?.addEventListener("click",()=>this._search(this._query));
     const go = this.shadowRoot.querySelector(".go");
-    if (go) BuschUI.action({node:go,label:go.getAttribute("aria-label")||go.title||go.textContent,onClick:() => this._search(input && input.value)});
+    if (go) BuschUI.action({node:go,label:go.getAttribute("aria-label")||go.title||go.textContent,variant:"icon-only",onClick:() => this._search(input && input.value)});
     this.shadowRoot.querySelectorAll(".result").forEach((row) => {
       const open = () => this._openResult(this._results[Number(row.dataset.index)]);
       row.addEventListener("click", open);
