@@ -1,0 +1,5 @@
+{
+  "beschreibung": "Ausnahmen der Kontrast- und Touchmessung (M26) für ha-arrstack-cards; jeder Eintrag braucht einen Grund. Form: hacs/scripts/kontrast_touch.py.",
+  "kontrast": [],
+  "touch": []
+}

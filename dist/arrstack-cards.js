@@ -1233,6 +1233,13 @@ const ARRSTACK_GEMEINSAM = `
      nur, was die Familie dazu festlegt: Schriftstufe, Hover, Abstand. */
   .busch-btn { font-size: var(--arr-font-md); }
   .busch-btn .icon { flex: none; }
+  /* M26, E6: the error colour as text reaches only 4.3:1 on a light and 4.0:1
+     on a dark card. Mixed with the text colour it gets darker in light and
+     lighter in dark (6.1 and 5.1:1 with the HA default themes); the border
+     keeps the plain error colour. */
+  .busch-btn[data-variant=destructive]:not([data-filled]) {
+    color: color-mix(in srgb, var(--error-color, #db4437) 75%, var(--primary-text-color, #212121));
+  }
   .busch-btn:is(:not([data-variant]), [data-variant=secondary], [data-variant=destructive]:not([data-filled])):hover:not(:disabled) {
     background: var(--arr-surface);
   }

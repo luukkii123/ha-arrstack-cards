@@ -404,3 +404,35 @@ test("M42: the bundle registers through BuschUI.register only", () => {
   assert.ok(!/customCards\.push\s*\(/.test(OWN), "no unguarded customCards.push");
   assert.equal((OWN.match(/BuschUI\.register\(/g) || []).length >= 1, true);
 });
+
+/* ── M26: contrast fixes found by calculation (the final run measures) ──── */
+
+const hex = (value) => value.replace("#", "").match(/../g).map((part) => parseInt(part, 16));
+const luminance = (rgb) => {
+  const [r, g, b] = rgb.map((c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+const contrast = (a, b) => { const [x, y] = [luminance(a), luminance(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+const mix = (a, b, share) => a.map((c, i) => Math.round(c * share + b[i] * (1 - share)));
+/** Theme values of docs/render/render.py (light and dark). */
+const THEMES = { light: { error: "#db4437", text: "#212121", card: "#ffffff" }, dark: { error: "#db4437", text: "#e1e1e1", card: "#1c1c1c" } };
+
+test("M26: the outlined destructive button text reaches 4.5:1 in light and dark", () => {
+  const rule = (OWN.match(/\.busch-btn\[data-variant=destructive\]:not\(\[data-filled\]\)\s*\{([^}]*)\}/) || [])[1] || "";
+  const m = rule.match(/color:\s*color-mix\(in srgb,\s*var\(--error-color[^)]*\)\s*(\d+)%,\s*var\(--primary-text-color[^)]*\)\)/);
+  assert.ok(m, `destructive text mixes the error colour with the text colour: ${rule}`);
+  for (const [name, theme] of Object.entries(THEMES)) {
+    const plain = contrast(hex(theme.error), hex(theme.card));
+    const mixed = contrast(mix(hex(theme.error), hex(theme.text), Number(m[1]) / 100), hex(theme.card));
+    assert.ok(plain < 4.5, `${name}: the plain error colour fails (${plain.toFixed(2)}), the fix is needed`);
+    assert.ok(mixed >= 4.5, `${name}: ${mixed.toFixed(2)}:1`);
+  }
+});
+
+test("M26: no own text in the primary colour, only icons, bars, outlines and tints", () => {
+  const css = OWN.replace(/\/\*[\s\S]*?\*\//g, "");
+  const accentText = [...css.matchAll(/([^{}]+)\{([^}]*)\}/g)]
+    .filter(([, , body]) => /(?:^|[;\s])color:\s*var\(--(?:arr-accent|primary-color)/.test(body))
+    .map(([, selector]) => selector.trim().replace(/\s+/g, " "));
+  assert.deepEqual(accentText, [".head-media", ".head-title .icon"], "accent colour only on the service symbol");
+});

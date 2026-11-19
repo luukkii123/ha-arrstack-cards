@@ -397,6 +397,7 @@ try:
 
         page.evaluate("() => document.documentElement.classList.add('ha-tokens')")
         ui_mit_tokens = regeln.lauf_breiten(page, breiten=(320,390,480,960), messung=messe_alle)
+        ui_mit_tokens.update(regeln.messe_kontrast_touch(page, KARTEN, ausnahmen=pathlib.Path(__file__).with_name("kontrast-ausnahmen.json"), breiten=(320,390,480,960)))  # M26
         page.evaluate("() => document.documentElement.classList.remove('ha-tokens')")
 
         # Screenshots aus dem Regel-1-Lauf, damit jemand hineinsehen kann.
