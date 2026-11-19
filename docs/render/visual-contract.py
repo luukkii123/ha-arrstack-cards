@@ -204,12 +204,30 @@ try:
               labelText.textContent=this.computeLabel(field);label.append(labelText);
               const helper=document.createElement('small');helper.textContent=this.computeHelper(field);
               let control;
-              if(field.selector?.select){
+              // Like ha-form: single selects show only the editor's own options (an
+              // empty value must have a named placeholder), a multiple select shows
+              // its chosen values as chips plus a picker for the rest, and a boolean
+              // is a row with the switch in a 44 px cell next to its label (M32).
+              if(field.selector?.select?.multiple){
+                const chosen=this._data[field.name]||[],options=field.selector.select.options||[];
+                const chips=document.createElement('span');chips.className='chips';
+                for(const value of chosen){const chip=document.createElement('span');chip.className='chip';
+                  chip.textContent=options.find(option=>option.value===value)?.label||value;chips.append(chip);}
                 control=document.createElement('select');
-                const empty=document.createElement('option');empty.textContent='—';empty.value='';control.append(empty);
+                const add=document.createElement('option');add.textContent='+';add.value='';control.append(add);
+                for(const option of options.filter(option=>!chosen.includes(option.value))){const item=document.createElement('option');
+                  item.value=option.value;item.textContent=option.label;control.append(item);}
+                label.append(chips);
+              }else if(field.selector?.select){
+                control=document.createElement('select');
                 for(const option of field.selector.select.options||[]){const item=document.createElement('option');
                   item.value=option.value;item.textContent=option.label;control.append(item);}
                 control.value=this._data[field.name]||'';
+              }else if(field.selector?.boolean){
+                row.classList.add('bool-row');
+                const cell=document.createElement('span');cell.className='bool-cell';
+                control=document.createElement('input');control.type='checkbox';control.checked=!!this._data[field.name];
+                cell.append(control);label.prepend(cell);row.append(label,helper);this.append(row);continue;
               }else{
                 control=document.createElement('input');
                 control.type=field.selector?.number?'number':field.selector?.boolean?'checkbox':'text';
@@ -237,12 +255,19 @@ try:
               padding:8px;border:1px solid var(--divider-color);border-radius:8px;
               background:var(--card-background-color);color:var(--primary-text-color);font:inherit;caret-color:transparent}
             .form-row input:focus-visible,.form-row select:focus-visible{outline:2px solid var(--primary-color);outline-offset:2px}
+            .bool-row label{grid-template-columns:44px minmax(0,1fr);align-items:center;gap:8px}
+            .bool-cell{display:flex;align-items:center;justify-content:center;width:44px;height:44px}
+            .form-row .bool-cell input{width:24px;height:24px;min-height:0;margin:0;padding:0}
+            .bool-row small{padding-left:52px}
+            .chips{display:flex;flex-wrap:wrap;gap:4px;min-width:0}
+            .chip{padding:2px 8px;border:1px solid var(--divider-color);border-radius:16px;font-size:12px;overflow-wrap:anywhere}
           `;document.head.append(style);
           document.getElementById('wrap').style.display='none';
           const wrap=document.createElement('div');wrap.id='editor-wrap';document.body.append(wrap);
           for(const tag of ['arrstack-downloads-card','arrstack-recent-card','arrstack-fix-card','arrstack-seer-card']){
-            const card=document.createElement(tag),panel=document.createElement('ha-card');panel.className='editor-panel';
-            const title=document.createElement('h2');title.textContent=tag;panel.append(title);
+            const card=document.createElement(tag),panel=document.createElement('ha-card');panel.className='editor-panel';panel.dataset.card=tag;
+            const title=document.createElement('h2');
+            title.textContent=(window.customCards||[]).find(entry=>entry.type===tag)?.name||tag;panel.append(title);
             const editor=card.constructor.getConfigElement();editor.setConfig({...card.constructor.getStubConfig(),title:'Sehr langer Beispielkartenname für das schmale Dashboard'});
             editor.hass={locale:{language:'de'},states:{},callWS:async()=>({instances:[
               {service:'sonarr',entry_id:'sonarr-1',title:'Sonarr Beispielinstanz'},
@@ -263,7 +288,7 @@ try:
                 page.screenshot(path=str(out / name), full_page=True)
                 metrics = page.evaluate("""() => {
                   const fields=[...document.querySelectorAll('#editor-wrap .form-row')];
-                  const controls=fields.map(row=>row.querySelector('input,select'));
+                  const controls=fields.map(row=>row.querySelector('.bool-cell,input,select'));
                   const within=fields.every(row=>{
                     const panel=row.closest('.editor-panel').getBoundingClientRect(),r=row.getBoundingClientRect();
                     return r.left>=panel.left-1&&r.right<=panel.right+1;
@@ -279,8 +304,24 @@ try:
                   const helpers=fields.every(row=>!!row.querySelector('small').textContent.trim());
                   const options=[...document.querySelectorAll('#editor-wrap select')]
                     .map(select=>select.options.length);
+                  // M32: heading is the card name, booleans are rows with a 44 px cell,
+                  // no select is blank, the column order names its state.
+                  const headings=[...document.querySelectorAll('#editor-wrap .editor-panel')].map(panel=>({
+                    card:panel.dataset.card,text:panel.querySelector('h2').textContent,
+                    expected:(window.customCards||[]).find(entry=>entry.type===panel.dataset.card)?.name||null}));
+                  const booleans=[...document.querySelectorAll('#editor-wrap .bool-row')].map(row=>{
+                    const cell=row.querySelector('.bool-cell').getBoundingClientRect(),
+                      text=row.querySelector('.field-label').getBoundingClientRect();
+                    return {width:Math.round(cell.width),height:Math.round(cell.height),
+                      beside:text.left>=cell.right-1&&text.top<cell.bottom&&text.bottom>cell.top};
+                  });
+                  const blankSelects=[...document.querySelectorAll('#editor-wrap .form-row:not(:has(.chips)) select')]
+                    .filter(select=>!select.selectedOptions[0]?.textContent.trim()).length;
+                  const order=document.querySelector('#editor-wrap .queue-column-order');
+                  const orderState=order&&!order.hidden?(order.querySelector('.queue-order-summary')?.textContent.trim()||''):
+                    (document.querySelector('#editor-wrap .queue-order-hint')?.textContent.trim()||'');
                   controls[0]?.focus();
-                  return {fields:fields.length,within,collides,textOverflow,helpers,options,
+                  return {fields:fields.length,within,collides,textOverflow,helpers,options,headings,booleans,blankSelects,orderState,
                     minimumHeight:Math.min(...controls.map(el=>el.getBoundingClientRect().height)),
                     outline:getComputedStyle(controls[0]).outlineStyle,
                     pageWidth:document.documentElement.scrollWidth,viewport:innerWidth};
@@ -291,6 +332,17 @@ try:
                         or metrics["minimumHeight"] < 44 or metrics["outline"] == "none"
                         or metrics["fields"] != 23 or min(metrics["options"]) < 2):
                     findings.append(f"Editoren {width}/{theme}: {metrics}")
+                # M32 (#1308): measured, so the closing run proves the editor picture.
+                if len(metrics["headings"]) != 4 or any(not h["expected"] or h["text"] != h["expected"] or h["text"] == h["card"]
+                                                         for h in metrics["headings"]):
+                    findings.append(f"Editoren {width}/{theme}: Ueberschrift ist nicht der Kartenname: {metrics['headings']}")
+                if len(metrics["booleans"]) != 2 or any(b["width"] < 44 or b["height"] < 44 or not b["beside"]
+                                                        for b in metrics["booleans"]):
+                    findings.append(f"Editoren {width}/{theme}: Schalterzeile ohne 44-px-Zelle neben dem Label: {metrics['booleans']}")
+                if metrics["blankSelects"]:
+                    findings.append(f"Editoren {width}/{theme}: {metrics['blankSelects']} Auswahl(en) ohne Platzhalter")
+                if not metrics["orderState"]:
+                    findings.append(f"Editoren {width}/{theme}: Spaltenreihenfolge ohne erklaerten Zustand")
         browser.close()
 finally:
     server.shutdown()

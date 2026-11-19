@@ -392,6 +392,7 @@ const TEXTE_ARRSTACK_BASIS = {
     verwerfen: 'Verwerfen',
     behalten: 'Weiter bearbeiten',
     laden: "Lade …",
+    automatisch: "Automatisch",
     schliessen: "Schließen",
     abbrechen: "Abbrechen",
     fehler_nicht_gefunden: "Kein passender arrstack-Dienst eingerichtet.",
@@ -456,6 +457,7 @@ const TEXTE_ARRSTACK_BASIS = {
     verwerfen: 'Discard',
     behalten: 'Keep editing',
     laden: "Loading …",
+    automatisch: "Automatic",
     schliessen: "Close",
     abbrechen: "Cancel",
     fehler_nicht_gefunden: "No matching arrstack service configured.",
@@ -566,6 +568,7 @@ const TEXTE_ARRSTACK_DOWNLOADS_CARD = {
       ...TEXTE_ARRSTACK_BASIS.de,
       kartentitel: "Downloads",
       spaltenreihenfolge: "Spaltenreihenfolge", hoch: "Hoch", runter: "Runter",
+      spalten_keine: "Keine Spalte gewählt. Die Karte zeigt die Vorgabespalten: {spalten}.",
       nach_oben: "nach oben", nach_unten: "nach unten", poster: "Poster", aktionen: "Aktionen", import_hinweise: "Importhinweise",
       leer: "Nichts in der Warteschlange.",
     },
@@ -597,6 +600,7 @@ const TEXTE_ARRSTACK_DOWNLOADS_CARD = {
       ...TEXTE_ARRSTACK_BASIS.en,
       kartentitel: "Downloads",
       spaltenreihenfolge: "Column order", hoch: "Up", runter: "Down",
+      spalten_keine: "No column chosen. The card shows the default columns: {spalten}.",
       nach_oben: "up", nach_unten: "down", poster: "Poster", aktionen: "Actions", import_hinweise: "Import notes",
       leer: "Nothing in the queue.",
     },
@@ -2046,11 +2050,14 @@ class ArrstackCardEditor extends BuschUI.EditorBase {
 
   /** Das feste Schema der Karte, nur die Auswahllisten werden gefüllt. */
   _schema() {
-    const instanzen = (this._instances || []).map((instance) => ({
+    // An empty value means "let the integration pick" (M32): name it instead of
+    // leaving a blank select; value-changed drops the empty key again.
+    const automatisch = { value: "", label: this._woerterbuch[this._sprache()].texte.automatisch };
+    const instanzen = [automatisch, ...(this._instances || []).map((instance) => ({
       value: instance.entry_id,
       label: `${instance.title}`,
-    }));
-    const dienste = this._services.map((service) => ({ value: service, label: service }));
+    }))];
+    const dienste = [automatisch, ...this._services.map((service) => ({ value: service, label: service }))];
     return this._basisSchema.map((feld) => {
       if (feld.name === "entry_id") {
         return {
@@ -2080,20 +2087,25 @@ class ArrstackCardEditor extends BuschUI.EditorBase {
       };
       this._form.addEventListener("value-changed", (event) => {
         event.stopPropagation();
-        this._config = this._normalizeConfig({ ...this._config, ...cloneEditorValue(event.detail.value || {}) });
+        const raw = event.detail.value || {};
+        const next = { ...this._config, ...cloneEditorValue(raw) };
+        for (const key of ["entry_id", "service"]) if (next[key] === "") delete next[key];
+        this._config = this._normalizeConfig(next);
         BuschUI.queueEcho(this._echoState,this._config);
         // ha-form besitzt den gerade editierten Zustand bereits. Kein
         // data-Reset während einer Tastatureingabe oder beim HA-Echo.
         this._renderedConfig = this._config;
         BuschUI.emitConfigChanged(this,this._config,{echo:false});
-        this._afterFormChange();
+        this._afterFormChange(raw);
       });
       const style=document.createElement('style');style.textContent=BuschUI.editorStyles;this.classList?.add('busch-ui-editor');
       this.appendChild(this._form);this.appendChild(style);
     }
-    if (this._renderedInstances !== this._instances) {
+    const language = this._sprache();
+    if (this._renderedInstances !== this._instances || this._renderedLanguage !== language) {
       this._form.schema = this._schema();
       this._renderedInstances = this._instances;
+      this._renderedLanguage = language;
     }
     this._form.hass = this._hass;
     if (this._renderedConfig !== this._config) {
@@ -2111,13 +2123,17 @@ class ArrstackDownloadsEditor extends ArrstackCardEditor {
   _schema() {
     return super._schema().map(field=>field.name==='columns' ? {...field,selector:{select:{multiple:true,custom_value:false,mode:'dropdown',options:Object.keys(ARRSTACK_QUEUE_COLUMNS).map(key=>({value:key,label:queueColumnLabel(key,this._sprache())}))}}} : field);
   }
-  _render() {
-    super._render();
-    const language=this._sprache();
-    if(this._form && this._renderedLanguage && this._renderedLanguage!==language) this._form.schema=this._schema();
-    this._renderedLanguage=language;this._renderOrder();
+  setConfig(config) {
+    const before=this._config;super.setConfig(config);
+    // Only a config that reaches the form refills the multi-select; HA's echo does not.
+    if (this._config!==before) {this._columnsChosen=true;this._renderOrder();}
   }
-  _afterFormChange() { this._renderOrder(); }
+  _render() { super._render(); this._renderOrder(); }
+  /** ha-form keeps an emptied multi-select empty while the card falls back to its default columns. */
+  _afterFormChange(raw) {
+    this._columnsChosen=Array.isArray(raw.columns) && raw.columns.some(key=>Object.hasOwn(ARRSTACK_QUEUE_COLUMNS,key));
+    this._renderOrder();
+  }
   _moveColumn(key,direction) {
     const columns=queueColumns(this._config.columns),index=columns.indexOf(key),next=index+direction;
     if (index<0 || next<0 || next>=columns.length) return;
@@ -2131,8 +2147,13 @@ class ArrstackDownloadsEditor extends ArrstackCardEditor {
   }
   _renderOrder() {
     if (!this._form || !this._config) return;
-    if (!this._order) {this._order=document.createElement('details');this._order.className='queue-column-order';this.appendChild(this._order);}
-    const renderKey=JSON.stringify([queueColumns(this._config.columns),this._sprache()]);
+    if (!this._order) {
+      this._order=document.createElement('details');this._order.className='queue-column-order';this.appendChild(this._order);
+      this._orderHint=document.createElement('p');this._orderHint.className='queue-order-hint';this.appendChild(this._orderHint);
+    }
+    const chosen=this._columnsChosen!==false;
+    this._order.hidden=!chosen;this._orderHint.hidden=chosen;
+    const renderKey=JSON.stringify([queueColumns(this._config.columns),this._sprache(),chosen]);
     if(this._orderKey===renderKey) return;
     this._orderKey=renderKey;
     let active=document.activeElement;
@@ -2140,10 +2161,12 @@ class ArrstackDownloadsEditor extends ArrstackCardEditor {
     const focus=this._order.querySelectorAll?.('button') ? Array.from(this._order.querySelectorAll('button')).find(button=>button===active) : null;
     const key=focus?.dataset.column,move=focus?.dataset.move;
     const columns=queueColumns(this._config.columns),t=this._woerterbuch[this._sprache()].texte;
-    this._order.innerHTML=`<summary>${escapeHtml(t.spaltenreihenfolge)}</summary><div role="status" aria-live="polite" class="queue-order-status">${columns.map(key=>queueColumnLabel(key,this._sprache())).join(' · ')}</div>${columns.map((key,index)=>`<div class="queue-order-row"><span>${escapeHtml(queueColumnLabel(key,this._sprache()))}</span><button type="button" data-column="${key}" data-move="-1" aria-label="${escapeHtml(`${queueColumnLabel(key,this._sprache())} ${t.nach_oben}`)}" ${index===0 ? 'disabled' : ''}>${escapeHtml(t.hoch)}</button><button type="button" data-column="${key}" data-move="1" aria-label="${escapeHtml(`${queueColumnLabel(key,this._sprache())} ${t.nach_unten}`)}" ${index===columns.length-1 ? 'disabled' : ''}>${escapeHtml(t.runter)}</button></div>`).join('')}`;
+    const order=columns.map(key=>queueColumnLabel(key,this._sprache())).join(' · ');
+    this._orderHint.textContent=t.spalten_keine.replace('{spalten}',order);
+    this._order.innerHTML=`<summary><span>${escapeHtml(t.spaltenreihenfolge)}</span><small class="queue-order-summary">${escapeHtml(order)}</small></summary><div role="status" aria-live="polite" class="queue-order-status">${escapeHtml(order)}</div>${columns.map((key,index)=>`<div class="queue-order-row"><span>${escapeHtml(queueColumnLabel(key,this._sprache()))}</span><button type="button" data-column="${key}" data-move="-1" aria-label="${escapeHtml(`${queueColumnLabel(key,this._sprache())} ${t.nach_oben}`)}" ${index===0 ? 'disabled' : ''}>${escapeHtml(t.hoch)}</button><button type="button" data-column="${key}" data-move="1" aria-label="${escapeHtml(`${queueColumnLabel(key,this._sprache())} ${t.nach_unten}`)}" ${index===columns.length-1 ? 'disabled' : ''}>${escapeHtml(t.runter)}</button></div>`).join('')}`;
     this._order.querySelectorAll?.('button').forEach(button=>button.addEventListener('click',()=>this._moveColumn(button.dataset.column,Number(button.dataset.move))));
     if (key) Array.from(this._order.querySelectorAll('button')).find(button=>button.dataset.column===key && button.dataset.move===move)?.focus();
-    if (!this._orderStyle) {this._orderStyle=document.createElement('style');this._orderStyle.textContent=`.queue-column-order{margin-top:var(--ha-space-4,24px);color:var(--primary-text-color)}.queue-column-order summary{cursor:pointer;min-height:44px;display:flex;align-items:center}.queue-order-status{font-size:var(--ha-font-size-s,0.8125rem);overflow-wrap:anywhere;margin-bottom:var(--ha-space-2,8px)}.queue-order-row{display:flex;align-items:center;gap:var(--ha-space-2,8px)}.queue-order-row span{flex:1;min-width:0;overflow-wrap:anywhere}.queue-order-row button{font:inherit;min-height:44px;min-width:44px;padding:var(--ha-space-2,8px);border:0;border-radius:var(--ha-card-border-radius,12px);background:none;color:var(--primary-text-color);cursor:pointer}.queue-order-row button:disabled{color:var(--secondary-text-color);cursor:default}.queue-order-row button:focus-visible{outline:2px solid var(--primary-color)}`;this.appendChild(this._orderStyle);}
+    if (!this._orderStyle) {this._orderStyle=document.createElement('style');this._orderStyle.textContent=`.queue-column-order{margin-top:var(--ha-space-4,24px);color:var(--primary-text-color)}.queue-column-order summary{cursor:pointer;min-height:44px;display:flex;flex-direction:column;justify-content:center;min-width:0}.queue-order-summary,.queue-order-hint{font-size:var(--ha-font-size-s,0.8125rem);color:var(--secondary-text-color);overflow-wrap:anywhere}.queue-column-order[open] .queue-order-summary{display:none}.queue-order-hint{margin:var(--ha-space-4,24px) 0 0}.queue-order-status{font-size:var(--ha-font-size-s,0.8125rem);overflow-wrap:anywhere;margin-bottom:var(--ha-space-2,8px)}.queue-order-row{display:flex;align-items:center;gap:var(--ha-space-2,8px)}.queue-order-row span{flex:1;min-width:0;overflow-wrap:anywhere}.queue-order-row button{font:inherit;min-height:44px;min-width:44px;padding:var(--ha-space-2,8px);border:0;border-radius:var(--ha-card-border-radius,12px);background:none;color:var(--primary-text-color);cursor:pointer}.queue-order-row button:disabled{color:var(--secondary-text-color);cursor:default}.queue-order-row button:focus-visible{outline:2px solid var(--primary-color)}`;this.appendChild(this._orderStyle);}
   }
 }
 

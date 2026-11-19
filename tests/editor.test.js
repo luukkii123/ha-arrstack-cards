@@ -159,7 +159,8 @@ async function quietEditorSetup(tag) {
 for (const tag of EDITOR_TAGS) {
   test(`${tag}: instance picker lists only matching services, labels and helpers are sentences`, async () => {
     const { form } = await mainEditorSetup(tag);
-    assert.equal(form.schema.find((field) => field.name === "entry_id").selector.select.options.length, 1);
+    assert.deepEqual(Array.from(form.schema.find((field) => field.name === "entry_id").selector.select.options, (o) => o.value),
+      ["", tag.includes("seer") ? "seerr-1" : "sonarr-1"], `${tag}: placeholder plus the one matching instance`);
     assert.equal(form.computeLabel(form.schema[0]) !== form.schema[0].name, true);
     assert.match(form.computeHelper(form.schema[0]), /[.!?]$/);
   });
@@ -173,7 +174,7 @@ for (const tag of EDITOR_TAGS) {
     editor.setConfig(JSON.parse(JSON.stringify(original)));
     editor.hass = { ...editor._hass, locale: { language: "en" } };
     assert.equal(form.dataWrites, writes, `${tag}: gleiche Config und hass dürfen Eingabe nicht zurücksetzen`);
-    assert.equal(form.schemaWrites, schemaWrites + (tag.includes("downloads") ? 1 : 0), `${tag}: nur neue Spaltenlabels brauchen Schema bei Sprachwechsel`);
+    assert.equal(form.schemaWrites, schemaWrites + 1, `${tag}: nur der Sprachwechsel schreibt das Schema neu (Platzhalter, Spaltenlabels)`);
     assert.notEqual(form.computeLabel(form.schema[0]), "Überschrift");
   });
 
@@ -246,8 +247,8 @@ for (const tag of EDITOR_TAGS) {
     await flush();
     assert.equal(calls, 1, `${tag}: erster Instanzabruf lief`);
     assert(retryEditor.children[0], `${tag}: form is still rendered after a rejected callWS`);
-    assert.equal(retryEditor.children[0].schema.find((field) => field.name === "entry_id")
-      .selector.select.options.length, 0, `${tag}: no stale options after a rejected callWS`);
+    assert.deepEqual(Array.from(retryEditor.children[0].schema.find((field) => field.name === "entry_id")
+      .selector.select.options, (o) => o.value), [""], `${tag}: no stale options after a rejected callWS`);
     retryEditor.hass = {
       locale: { language: "de" },
       callWS: async () => {
@@ -258,8 +259,8 @@ for (const tag of EDITOR_TAGS) {
     };
     await flush();
     assert.equal(calls, 2, `${tag}: hass-Update wiederholt fehlgeschlagenen Instanzabruf`);
-    assert.equal(retryEditor.children[0].schema.find((field) => field.name === "entry_id")
-      .selector.select.options.length, 1, `${tag}: wiederhergestellte Option erscheint`);
+    assert.deepEqual(Array.from(retryEditor.children[0].schema.find((field) => field.name === "entry_id")
+      .selector.select.options, (o) => o.value), ["", "retry-1"], `${tag}: wiederhergestellte Option erscheint`);
   });
 
   test(`${tag}: keydown and keyup stay inside the editor without preventing defaults`, async () => {
@@ -273,3 +274,49 @@ for (const tag of EDITOR_TAGS) {
     }
   });
 }
+
+// M32 (#1308): empty pickers name their automatic choice, and the column order
+// only appears while the form really has chosen columns.
+for (const tag of EDITOR_TAGS) {
+  test(`${tag}: instance and service pickers start with an automatic placeholder`, async () => {
+    const { editor, form } = await mainEditorSetup(tag);
+    for (const name of ["entry_id", "service"]) {
+      const options = form.schema.find((field) => field.name === name).selector.select.options;
+      assert.deepEqual({ ...options[0] }, { value: "", label: "Automatisch" }, `${tag}: ${name} beginnt mit Automatisch`);
+      assert.equal(options.filter((option) => option.value === "").length, 1, `${tag}: ${name} hat genau einen Platzhalter`);
+    }
+    assert.deepEqual(Array.from(form.schema.find((field) => field.name === "entry_id").selector.select.options.slice(1), (o) => o.value),
+      [tag.includes("seer") ? "seerr-1" : "sonarr-1"], `${tag}: echte Instanzen folgen dem Platzhalter`);
+    editor.hass = { ...editor._hass, locale: { language: "en" } };
+    assert.equal(editor.children[0].schema.find((field) => field.name === "service").selector.select.options[0].label,
+      "Automatic", `${tag}: Platzhalter folgt der Sprache`);
+  });
+
+  test(`${tag}: choosing the automatic placeholder removes the key from the config`, async () => {
+    const { editor, emitted, form } = await mainEditorSetup(tag);
+    form.dispatchEvent({ type: "value-changed", detail: { value: { ...editor._config, entry_id: "", service: "" } }, stopPropagation() {} });
+    assert.equal(Object.hasOwn(emitted.at(-1), "entry_id"), false, `${tag}: leere Instanz nicht gespeichert`);
+    assert.equal(Object.hasOwn(emitted.at(-1), "service"), false, `${tag}: leerer Dienst nicht gespeichert`);
+  });
+}
+
+test("downloads editor shows the column order only while columns are chosen", async () => {
+  const { columnEditor } = await columnEditorSetup();
+  assert.equal(columnEditor._order.hidden, false, "gewählte Spalten: Reihenfolge sichtbar");
+  assert.equal(columnEditor._orderHint.hidden, true, "gewählte Spalten: kein Hinweis");
+  columnEditor.children[0].dispatchEvent({type:'value-changed',detail:{value:{...columnEditor._config,columns:[]}},stopPropagation(){}});
+  assert.equal(columnEditor._order.hidden, true, "keine Spalte gewählt: Reihenfolge verborgen");
+  assert.equal(columnEditor._orderHint.hidden, false, "keine Spalte gewählt: Zustand erklärt");
+  assert.match(columnEditor._orderHint.textContent, /Keine Spalte gewählt/);
+  assert.match(columnEditor._orderHint.textContent, /Serie \/ Film · Status · Episode · Restzeit · Fortschritt/);
+  columnEditor.setConfig(JSON.parse(JSON.stringify(columnEditor._config)));
+  assert.equal(columnEditor._orderHint.hidden, false, "HA-Echo füllt das leere Formular nicht, Hinweis bleibt");
+  columnEditor.children[0].dispatchEvent({type:'value-changed',detail:{value:{...columnEditor._config,columns:['episode']}},stopPropagation(){}});
+  assert.equal(columnEditor._order.hidden, false, "wieder gewählt: Reihenfolge sichtbar");
+  assert.equal(columnEditor._orderHint.hidden, true, "wieder gewählt: Hinweis verborgen");
+});
+
+test("downloads editor names the current column order in the collapsed summary", async () => {
+  const { columnEditor } = await columnEditorSetup();
+  assert.match(columnEditor._order.innerHTML, /<summary>[^]*Spaltenreihenfolge[^]*Serie \/ Film · Status[^]*<\/summary>/);
+});

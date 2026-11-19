@@ -621,7 +621,7 @@ try:
                 labelOhnePunkt: [...de, ...en].every(f => !/[.]$/.test(f.label)),
                 gleich: JSON.stringify(de) === JSON.stringify(en),
                 instanzOptionen: (schema.find(f => f.name === 'entry_id') || {})
-                  .selector.select.options.length,
+                  .selector.select.options.filter(o => o.value !== '').length,
               };
               ed.remove();
             }

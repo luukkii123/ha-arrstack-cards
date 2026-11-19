@@ -116,8 +116,8 @@ def run(bundle, credentials, dashboard, output):
             schema = editor.evaluate("""ed => {
                 const s=ed.querySelector('ha-form').schema;
                 return {names:s.map(x=>x.name),
-                    instance_options:s.find(x=>x.name==='entry_id')?.selector.select.options.length,
-                    service_options:s.find(x=>x.name==='service')?.selector.select.options.length};
+                    instance_options:s.find(x=>x.name==='entry_id')?.selector.select.options.filter(o=>o.value!=='').length,
+                    service_options:s.find(x=>x.name==='service')?.selector.select.options.filter(o=>o.value!=='').length};
             }""")
             echo_contract = editor.evaluate("""ed => {
                 const run=(titles,echoes,external) => {
