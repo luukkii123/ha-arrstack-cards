@@ -80,6 +80,8 @@ stammt.
 
 ## Geprüft
 
+**20.11.2026 · 0.10.0, Buschcheck Etappe I (#1324, Tag `v0.10.0`)** — Kopfkommentar mit Test (M73), Seer-X ≥ 3:1, gewählte Staffel mit Rahmen, Fokus-Token, Shared UI 0.5.3, CI aus der Vorlage (M45). 174 Node-Tests; Baselines nach Sichtprüfung neu. Abschlusslauf `karten-20261119-234243-239269` grün (57/57, Volllauf, 2700 Node-Tests, Block `statisch` grün inkl. CI-Vorlage und Zeilenlänge), `--beleg-pruefen` gleich; Bilder am Bild geprüft (Sonnet).
+
 **19.11.2026 · 0.9.0, Buschcheck Etappe H (#1314, Tag `v0.9.0`)** — Shared UI 0.5.0: Zustandsbaustein (M27), `.busch-btn`/Chips/Hinweis (M62), Tokens (M63), Kopf Stufe 1 (M61), Dialoge über dialogHistory/focusTrap (M28), ein Zeilenraster für alle Listen, Status mit Symbol, Umlaute (M59), `BuschUI.register` (M42), Kontrast/Touch (M26). 164 Node-Tests; Baselines nach Sichtprüfung neu. Abschlusslauf `karten-20261119-195834-aaec84` grün (55/55, 2590 Node-Tests, Block `statisch` grün, Kontrast/Touch gemessen), `--beleg-pruefen` gleich; Bilder zweimal am Bild geprüft (Sonnet), Befunde behoben.
 
 **19.11.2026 · 0.8.0, Buschcheck Etappe G (#1308, Tag `v0.8.0`)** — Editoren mit „Automatisch“, Kartenname als Überschrift, Spaltenreihenfolge nur bei gewählten Spalten (M32; Baselines nach Sichtprüfung neu); Tabellenzellen ohne aria-label (M58). 136 Node-Tests. Abschlusslauf `karten-20261119-141846-b2547c` grün (43/43, 948 Node-Tests, Block `statisch` grün), `--beleg-pruefen` gleich; Bilder zweimal am Bild geprüft (Sonnet), Mängel bei 320 px behoben, sonst Rauschen.
