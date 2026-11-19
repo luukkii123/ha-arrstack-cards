@@ -1326,8 +1326,11 @@ const ARRSTACK_COMPACT = `
      ein Zustand, keine zweite Hauptaktion: getönt statt gefüllt. Gefüllt
      bleibt allein der Anfragen-Knopf. */
   .season { padding: 0 var(--arr-space-3); }
+  /* #1320: the tint alone was 1.2:1, so the chosen state also carries a 2 px inset frame in the checkbox mix,
+     >= 3:1 against the surface and the tint (light/dark #1c76be 6.34/5.88 on the surface, #03a9f4 4.21/7.88). */
   .season[aria-pressed="true"] {
     background: color-mix(in srgb, var(--arr-accent) 18%, transparent);
+    box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--arr-accent) 60%, var(--arr-text));
     font-weight: var(--arr-weight-bold);
   }
   .season[disabled] { cursor: default; opacity: 0.55; }

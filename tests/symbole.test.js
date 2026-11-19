@@ -78,3 +78,25 @@ test("#1320 progress fill and checkbox accent reach 3:1 (card, track), light and
   assert.equal(all.length, 12);
   assert.deepEqual(low, []);
 });
+
+// #1320 (Etappe I, selection state, WCAG 1.4.11): a chosen season was only an 18 % accent tint (light 1.2:1 against the
+// card), so the state had no 3:1 mark. The chosen chip now also carries a 2 px inset frame in the same mix as the checked
+// boxes (accent 60 % with the text colour), >= 3:1 against the surface around it (the inline request sits on --arr-surface,
+// the card for safety too) and against its own tint inside (the tint mixes with transparent, so it lies over --arr-surface);
+// aria-pressed stays the programmatic state.
+test("#1320 a chosen season carries a 3:1 frame against the card and its own tint; aria-pressed stays", () => {
+  const block = regel('.season[aria-pressed="true"]'), faelle = [];
+  const rahmen = (wert(block, "box-shadow") || "").match(/^inset 0 0 0 2px (.+)$/);
+  assert.ok(rahmen, "chosen season has an inset 2 px frame: " + block);
+  const toenung = wert(block, "background").match(/^color-mix\(in srgb, (var\(--arr-accent\)) (\d+)%, transparent\)$/);
+  assert.ok(toenung, "tint stays");
+  for (const [name, t] of Object.entries(THEMEN)) {
+    const karte = hex(t["card-background-color"]), umfeld = farbe("var(--arr-surface)", t), akzent = farbe(toenung[1], t), p = Number(toenung[2]) / 100;
+    const flaeche = akzent.map((v, i) => v * p + umfeld[i] * (1 - p)), fg = farbe(rahmen[1], t);
+    for (const [f, bg] of [["karte", karte], ["arr-surface", umfeld], ["toenung", flaeche]]) {
+      const q = quote(fg, bg); faelle.push(`frame ${f} ${name}: ${q.toFixed(2)}:1`); assert.ok(q >= 3, faelle.at(-1));
+    }
+  }
+  assert.equal(faelle.length, 12);
+  assert.match(SOURCE, /<button class="season busch-chip" data-season="\$\{season\.season\}"\s+aria-pressed="\$\{pressed\}"/);
+});
