@@ -2228,7 +2228,7 @@ class ArrstackCardEditor extends BuschUI.EditorBase {
     if (!this._form) {
       this._form = BuschUI.ha.form();
       this._form.computeLabel = (schema) => {
-        return BuschUI.fieldText(this._woerterbuch,this._hass,schema.name).label;
+        return schema.name;
       };
       this._form.computeHelper = (schema) => {
         return BuschUI.fieldText(this._woerterbuch,this._hass,schema.name).helper;
