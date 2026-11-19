@@ -342,32 +342,34 @@ const BuschUI = (() => {
 /* END BUSCH SHARED UI */
 
 /**
- * arrstack Cards — Lovelace-Karten zur Integration `arrstack`.
+ * arrstack Cards — Lovelace cards for the `arrstack` integration
+ * (Radarr, Sonarr, SABnzbd and Jellyseerr/Seerr).
  *
- * Vier Karten für Radarr, Sonarr, SABnzbd und Jellyseerr/Seerr:
- * laufende Downloads, zuletzt aufgenommen, hängende Importe samt Reparatur
- * und eine Suche mit Staffelauswahl zum Anfragen.
+ * Cards (one line per `window.customCards` entry, registered at the end of
+ * this file; tests/kopfkommentar.test.js compares this list with the entries):
+ *  - `arrstack-downloads-card` — running downloads of Sonarr, Radarr and SABnzbd.
+ *  - `arrstack-recent-card` — what Sonarr and Radarr added to the library last.
+ *  - `arrstack-fix-card` — downloads that were never imported, with a repair.
+ *  - `arrstack-seer-card` — Seerr search with season picker and request.
+ * Each card has an editor `<type>-editor`; `arrstack-dialog` is the shared
+ * dialog of the import repair.
  *
- * Bewusst ohne Build-Schritt: eine einzelne Datei, reines Vanilla-JS mit
- * Custom Elements. Was hier steht, ist genau das, was ausgeliefert wird.
+ * Deliberately without a build step: one file, plain vanilla JS with custom
+ * elements. What is here is exactly what ships. **No subfolders:** a HACS
+ * dashboard resource serves exactly one file. A new card is a class plus a
+ * `BuschUI.register(tag, Class, { type, name, description, preview: false,
+ * documentationURL })` at the end of this file and a line in the list above.
  *
- * Neue Karte hinzufügen: Klasse schreiben, `BuschUI.register(tag, Klasse,
- * { type, name, description, preview: false, documentationURL })` am
- * Dateiende — alles in dieser Datei. **Keine
- * Unterordner:** Eine HACS-Dashboard-Ressource liefert genau eine Datei aus,
- * alles darunter erreicht den Browser nie.
+ * The cards need the `arrstack` integration; without it they report that no
+ * matching arrstack service is set up. The integration also runs without them.
  *
- * Die Karten brauchen die Integration `arrstack`; ohne sie melden sie
- * „Kein passender arrstack-Dienst eingerichtet". Umgekehrt läuft die
- * Integration auch ganz ohne diese Karten.
- *
- * Seit 09.09.2026 gilt `hacs/docs/ui-regeln.md`:
- *  - Regel 1: jeder einzeilige Textcontainer kürzt, jeder mehrzeilige bricht.
- *  - Regel 2: was die Karte überlagert, ist ein Dialog mit eigenem
- *    Verlaufseintrag — Escape, Scrim, Zurück-Taste und Schließ-Knopf.
- *  - Regel 3: jedes Konfigurationsfeld hat Label und Helper, deutsch und
- *    englisch, in genau einem Wörterbuch je Karte.
- *  - Regel 4: Farben, Abstände und Schriftgrößen nur über Theme-Variablen.
+ * `hacs/docs/ui-regeln.md` applies (since 09.09.2026):
+ *  - Rule 1: every single-line text container truncates, every multi-line one wraps.
+ *  - Rule 2: whatever covers the card is a dialog with its own history entry —
+ *    Escape, scrim, the back button and the close button.
+ *  - Rule 3: every config field has a label and a helper, German and English,
+ *    in exactly one dictionary per card.
+ *  - Rule 4: colours, spacing and font sizes only through theme variables.
  */
 
 const CARD_VERSION = "0.9.0";
