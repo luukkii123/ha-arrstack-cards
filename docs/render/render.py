@@ -317,6 +317,7 @@ requests, responses, failures, console, errors = [], [], [], [], []
 probe = {}
 ui_ohne_tokens = ui_mit_tokens = selbst = None
 zeilenraster = {}
+suchfeld_x = {}
 popups = {}
 ui_dialog = {}
 eigen = {}
@@ -419,6 +420,38 @@ try:
                 page.evaluate("(t) => { document.documentElement.dataset.theme = t; }", thema)
                 page.wait_for_timeout(250)
                 page.screenshot(path=str(OUT / f"alle-{breite}-{thema}.png"), full_page=True)
+                # M26-Restfund Bildprüfung H: das X im Seerr-Suchfeld (Pseudo-Element) erreicht
+                # als Bedienelement 3:1 gegen die Feldfläche; die Kontrastmessung sieht es nicht.
+                suchfeld_x[f"{breite}-{thema}"] = page.evaluate("""() => {
+                  const root = window.__cards.seer.shadowRoot;
+                  const input = root.querySelector('.search input');
+                  // Aus der geladenen Regel statt per getComputedStyle(input, '::-webkit-…'): Blink löst
+                  // UA-Schatten-Pseudoelemente dort nicht verlässlich auf. Die Farbe löst eine Probe im
+                  // selben Schattenbaum auf, also mit den Tokens des gerade aktiven Themas.
+                  const regel = [...root.styleSheets, ...(root.adoptedStyleSheets || [])]
+                    .flatMap(sheet => [...sheet.cssRules])
+                    .find(r => (r.selectorText || '').includes('::-webkit-search-cancel-button'));
+                  if (!regel) return {nativ: 'auto', farbe: null, breite: 0, feld: null, kontrast: 0};
+                  const probe = document.createElement('span');
+                  probe.style.backgroundColor = regel.style.getPropertyValue('background-color');
+                  root.querySelector('.search').append(probe);
+                  const x = {webkitAppearance: regel.style.getPropertyValue('-webkit-appearance'),
+                             appearance: regel.style.getPropertyValue('appearance'),
+                             width: regel.style.getPropertyValue('width'),
+                             backgroundColor: getComputedStyle(probe).backgroundColor};
+                  probe.remove();
+                  const rgba = s => { const v = (s.match(/[\\d.]+/g) || []).map(Number); return [v[0], v[1], v[2], v.length > 3 ? v[3] : 1]; };
+                  const ueber = (oben, unten) => oben.slice(0, 3).map((c, i) => c * oben[3] + unten[i] * (1 - oben[3]));
+                  const lum = c => { const [r, g, b] = c.map(v => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; });
+                                     return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+                  const karte = rgba(getComputedStyle(root.querySelector('ha-card')).backgroundColor);
+                  const feld = ueber(rgba(getComputedStyle(input).backgroundColor), karte);
+                  const zeichen = ueber(rgba(x.backgroundColor), feld);
+                  const [hell, dunkel] = [lum(zeichen), lum(feld)].sort((p, q) => q - p);
+                  return {nativ: x.webkitAppearance || x.appearance, farbe: x.backgroundColor, breite: parseFloat(x.width),
+                          feld: 'rgb(' + feld.map(Math.round).join(', ') + ')',
+                          kontrast: Math.round((hell + 0.05) / (dunkel + 0.05) * 100) / 100};
+                }""")
 
         # ── M59: ein Zeilenraster, gemessen ──────────────────────────────────
         # Je Liste (Zuletzt, Import, Suche) und Breite: das Poster steht links
@@ -820,6 +853,7 @@ report = {
     "ui_popups": popups,
     "eigene_pruefungen": eigen,
     "zeilenraster": zeilenraster,
+    "suchfeld_x": suchfeld_x,
 }
 (OUT / "report.json").write_text(
     json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8"
@@ -897,6 +931,13 @@ for breite, befund in zeilenraster.items():
     if not befund["zeilen"] or befund["verstoesse"]:
         print("FEHLER: M59 Zeilenraster bei %s px: %s" % (breite, befund["verstoesse"] or "keine Zeilen gemessen"))
         schlecht = 1
+for breite, befund in suchfeld_x.items():
+    if befund["nativ"] != "none" or befund["kontrast"] < 3 or befund["breite"] < 16:
+        print("FEHLER: Seerr-Suchfeld, X bei %s: %s" % (breite, befund))
+        schlecht = 1
+if not suchfeld_x:
+    print("FEHLER: Seerr-Suchfeld, X nicht gemessen.")
+    schlecht = 1
 if report["page_errors"] or report["console_errors"]:
     print("FEHLER: Die Seite hat Fehler protokolliert.")
     schlecht = 1

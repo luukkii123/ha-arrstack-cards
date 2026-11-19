@@ -3006,6 +3006,19 @@ class ArrstackSeerCard extends ArrstackCardBase {
         border-radius: var(--arr-radius-1);
         background: var(--arr-surface);
       }
+      /* Chromium's native clear glyph is white on this field in the light theme (M26 image
+         review H): drawn here in the secondary text colour, 3:1 against --arr-surface. */
+      .search input::-webkit-search-cancel-button {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 18px;
+        height: 18px;
+        margin-inline-start: var(--arr-space-2);
+        cursor: pointer;
+        background-color: var(--arr-muted);
+        -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round'%3E%3Cpath d='M18 6 6 18M6 6l12 12'/%3E%3C/svg%3E") center / contain no-repeat;
+        mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round'%3E%3Cpath d='M18 6 6 18M6 6l12 12'/%3E%3C/svg%3E") center / contain no-repeat;
+      }
       .search .go { flex: 0 0 44px; width: 44px; display: inline-flex; align-items: center; justify-content: center; padding: 0; }
       .row.result { cursor: pointer; min-height: 66px; }
       .request-inline { padding: var(--arr-space-3); background: var(--arr-surface); }
