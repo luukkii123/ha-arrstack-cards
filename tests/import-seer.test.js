@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const types = new Map();
 class Element { attachShadow() { this.shadowRoot={innerHTML:'',querySelectorAll:()=>[],querySelector:()=>null}; } }
-const context={HTMLElement:Element,customElements:{define:(name,type)=>types.set(name,type)},document:{},window:{},navigator:{language:'de'},console:{info(){}},setTimeout,clearTimeout,setInterval,clearInterval};
+const context={HTMLElement:Element,customElements:{define:(name,type)=>types.set(name,type)},document:require('./_html.cjs').markupDocument(),window:{},navigator:{language:'de'},console:{info(){}},setTimeout,clearTimeout,setInterval,clearInterval};
 vm.runInNewContext(fs.readFileSync(__dirname+'/../dist/arrstack-cards.js','utf8'),context);
 
 const ready={id:2,queue_item_id:2,title:'Bereit',progress:100,download_complete:true,import_state:'ready',candidate_count:1};

@@ -8,6 +8,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const path = require("node:path");
 const kit = require("./_testkit.cjs");
+const { installOuterHTML } = require("./_html.cjs");
 
 const BUNDLE = path.join(__dirname, "..", "dist", "arrstack-cards.js");
 
@@ -31,11 +32,10 @@ function findings(html) {
 
 function setup() {
   const env = kit.createEnvironment({ language: "de-DE" });
-  // The test DOM keeps innerHTML unparsed: give it outerHTML for the card head
-  // and let patchQueueMarkup store the markup like a plain innerHTML sink.
-  Object.defineProperty(env.Element.prototype, "outerHTML", {
-    get() { return `<${this.localName} class="${this.className}">${this._innerHTML}</${this.localName}>`; },
-  });
+  // The test DOM keeps innerHTML unparsed: give it outerHTML for the blocks built
+  // as DOM (head, state blocks) and let patchQueueMarkup store the markup like a
+  // plain innerHTML sink.
+  installOuterHTML(env);
   env.history = { pushState() {}, back() {}, state: null };
   env.window.history = env.history;
   env.exposed = kit.loadScript(BUNDLE, { globals: env, expose: ["ARRSTACK_QUEUE_COLUMNS"] }).exposed;

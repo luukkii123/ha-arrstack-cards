@@ -145,12 +145,13 @@ try:
           const result={};
           for (const [name,card] of Object.entries(window.__cards)) {
             const original={data:card._data,error:card._error,results:card._results,message:card._message};
-            card._error=null;card._message=null;card._data=null;card._results=null;card._render();
-            const loading=!!card.shadowRoot.querySelector('.notice,.empty');
-            card._error=new Error('offline');card._render();
-            const error=!!card.shadowRoot.querySelector('.notice.problem');
+            // M27: one BuschUI.stateBlock per state, a live region from the start.
+            card._error=null;card._message=null;card._data=null;card._results=null;card._searching=true;card._render();
+            const loading=!!card.shadowRoot.querySelector('.busch-state[data-kind=loading][role=status][aria-live=polite]');
+            card._searching=false;card._error=new Error('offline');card._render();
+            const error=!!card.shadowRoot.querySelector('.busch-state[data-kind=error][role=alert] .act-retry');
             card._error=null;card._data={items:[]};card._results=[];card._render();
-            const empty=!!card.shadowRoot.querySelector('.empty');
+            const empty=!!card.shadowRoot.querySelector('.busch-state[data-kind=empty][role=status]');
             Object.assign(card,{_data:original.data,_error:original.error,
               _results:original.results,_message:original.message});card._render();
             result[name]={loading,error,empty};

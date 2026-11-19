@@ -2,9 +2,10 @@ const test=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const vm=require('node:vm');
+const {markupDocument}=require('./_html.cjs');
 const types=new Map();
 class Element {attachShadow(){this.shadowRoot={innerHTML:'',querySelector:()=>null,querySelectorAll:()=>[]};}}
-vm.runInNewContext(fs.readFileSync(__dirname+'/../dist/arrstack-cards.js','utf8'),{HTMLElement:Element,customElements:{define:(n,t)=>types.set(n,t)},document:{},window:{},navigator:{language:'de'},console:{info(){}},setInterval,clearInterval,setTimeout,clearTimeout});
+vm.runInNewContext(fs.readFileSync(__dirname+'/../dist/arrstack-cards.js','utf8'),{HTMLElement:Element,customElements:{define:(n,t)=>types.set(n,t)},document:markupDocument(),window:{},navigator:{language:'de'},console:{info(){}},setInterval,clearInterval,setTimeout,clearTimeout});
 const make=()=>{const c=new(types.get('arrstack-downloads-card'))();c._config={...c._defaults(),max_items:2};c._hass={locale:{language:'de'}};c._data={service:'sonarr',items:[]};return c;};
 const item={id:71,title:'Beispiel Release',parent_title:'Eine lange Beispielserie',episode:'S01E02',status:'completed',tracked_state:'importBlocked',is_problem:true,sizeleft:0,progress:100,messages:['Datei konnte nicht zugeordnet werden. Dateien prüfen.']};
 const rowIds=html=>[...html.matchAll(/data-item="(\d+)"/g)].map(match=>Number(match[1]));

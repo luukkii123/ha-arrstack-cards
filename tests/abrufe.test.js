@@ -8,6 +8,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const path = require("node:path");
 const kit = require("./_testkit.cjs");
+const { installOuterHTML } = require("./_html.cjs");
 
 const BUNDLE = path.join(__dirname, "..", "dist", "arrstack-cards.js");
 const row = (id, extra = {}) => ({ id, title: `Release ${id}`, parent_title: `Series ${id}`, status: "completed", tracked_state: "importBlocked", is_problem: true, sizeleft: 0, progress: 100, ...extra });
@@ -108,9 +109,7 @@ test("M13: errors back off exponentially, capped at 10 minutes", async () => {
 
 test("M13: the recent card does not rebuild its DOM for unchanged data", async () => {
   const { clock, env, ha, server, mount } = setup();
-  Object.defineProperty(env.Element.prototype, "outerHTML", {
-    get() { return `<${this.localName} class="${this.className}">${this._innerHTML}</${this.localName}>`; },
-  });
+  installOuterHTML(env);
   const card = mount("recent", {}, { render: true });
   await clock.flush();
   const root = card.shadowRoot, proto = Object.getPrototypeOf(root);

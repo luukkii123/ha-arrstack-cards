@@ -251,7 +251,7 @@ with sync_playwright() as pw:
     page.wait_for_function("!window.__cards.seer._show")
     check('movie-request',"() => window.__wsCalls.some(call=>call.type==='arrstack/request' && call.media_type==='movie' && !('seasons' in call))")
     page.evaluate("async()=>{window.__failSearch=true;await window.__cards.seer._search('保持 + ü');}")
-    check('human-error-details-closed',"() => {const root=window.__cards.seer.shadowRoot;return !root.querySelector('details').open && !root.querySelector('.notice').innerText.includes('raw backend failure') && root.querySelector('input').value==='保持 + ü';}")
+    check('human-error-details-closed',"() => {const root=window.__cards.seer.shadowRoot;return !root.querySelector('details').open && !root.querySelector('.busch-state[data-kind=error]').innerText.includes('raw backend failure') && root.querySelector('input').value==='保持 + ü';}")
     page.locator('codex-arrcompact-seer-card').screenshot(path=str(output/'seer-error.png'))
     page.evaluate('window.__failSearch=false')
     page.locator('codex-arrcompact-seer-card .act-retry').click()

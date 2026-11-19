@@ -7,6 +7,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const path = require("node:path");
 const kit = require("./_testkit.cjs");
+const { installOuterHTML } = require("./_html.cjs");
 
 const BUNDLE = path.join(__dirname, "..", "dist", "arrstack-cards.js");
 const row = (id) => ({ id, title: `Release ${id}`, parent_title: `Series ${id}`, status: "completed", tracked_state: "importBlocked", is_problem: true, sizeleft: 0, progress: 100 });
@@ -14,9 +15,7 @@ const row = (id) => ({ id, title: `Release ${id}`, parent_title: `Series ${id}`,
 function setup() {
   const clock = kit.createClock();
   const env = kit.createEnvironment({ clock, language: "de-DE" });
-  Object.defineProperty(env.Element.prototype, "outerHTML", {
-    get() { return `<${this.localName} class="${this.className}">${this._innerHTML}</${this.localName}>`; },
-  });
+  installOuterHTML(env);
   env.history = { pushState() {}, back() {}, state: null };
   env.window.history = env.history;
   const { exposed } = kit.loadScript(BUNDLE, { globals: env, expose: ["TEXTE_ARRSTACK_BASIS"] });

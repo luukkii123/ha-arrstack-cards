@@ -477,6 +477,9 @@ function bindImageFallbacks(root) {
   });
 }
 
+/** The same pictures as mdi names for BuschUI.stateBlock (M27); its own default per kind otherwise. */
+const ARR_STATE_ICONS = { download: "mdi:download", film: "mdi:filmstrip", check: "mdi:check-circle-outline", search: "mdi:magnify" };
+
 /** Ein Symbol als SVG-Zeichenkette. */
 function arrIcon(name, size = 18) {
   const paths = ARR_ICON_PATHS[name] || "";
@@ -1263,18 +1266,8 @@ const ARRSTACK_GEMEINSAM = `
     min-width: 0;
   }
 
-  .empty {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: var(--arr-space-2);
-    padding: var(--arr-space-4) 0;
-    color: var(--arr-muted);
-    font-size: var(--arr-font-sm);
-    text-align: center;
-  }
-  .empty .icon { opacity: 0.6; }
-  .empty-text { overflow-wrap: anywhere; max-width: 100%; }
+  /* Laden, Leer, Fehler: BuschUI.stateBlock (M27), dieselbe Form in allen Kartenfamilien. */
+  .busch-state details { align-self: stretch; text-align: start; }
 
   .notice {
     font-size: var(--arr-font-sm);
@@ -1285,7 +1278,7 @@ const ARRSTACK_GEMEINSAM = `
     overflow-wrap: anywhere;
   }
   .notice.problem { color: var(--arr-danger); }
-  .notice + .rows, .notice + .empty { margin-top: var(--arr-space-3); }
+  .notice + .rows, .notice + .busch-state { margin-top: var(--arr-space-3); }
 
   .chip {
     font-size: var(--arr-font-sm);
@@ -1364,8 +1357,6 @@ const ARRSTACK_COMPACT = `
   .status-badge, .status-badge.success, .status-badge.warning, .status-badge.error,
   .notice, .notice.problem, details summary, button.quiet { color: var(--arr-text); }
   .head-media { width: 44px; height: 44px; }
-  .empty { padding: var(--arr-space-2) 0; align-items: flex-start; text-align: start; }
-  .empty > .icon { display: none; }
   .poster { width: var(--arr-thumb); height: calc(var(--arr-thumb) * 1.5); }
   .row.result { display: grid; grid-template-columns: auto minmax(0,1fr); gap: var(--arr-space-2); }
   .row.result > .status-badge { grid-column: 2; justify-self: start; margin-top: calc(-1 * var(--arr-space-2)); }
@@ -1409,7 +1400,7 @@ const ARRSTACK_COMPACT = `
 
 const DIALOG_TAG = "arrstack-dialog";
 
-const DIALOG_STYLES = ARRSTACK_TOKENS + ARRSTACK_EINZEILIG + ARRSTACK_GEMEINSAM + ARRSTACK_COMPACT + `
+const DIALOG_STYLES = BuschUI.cardStyles + ARRSTACK_TOKENS + ARRSTACK_EINZEILIG + ARRSTACK_GEMEINSAM + ARRSTACK_COMPACT + `
   :host {
     position: fixed;
     inset: 0;
@@ -1943,19 +1934,58 @@ class ArrstackCardBase extends HTMLElement {
     return (error && error.message) || t.fehler_allgemein;
   }
 
-  _errorMarkup(error, heading, retry = true) {
-    const t = this._t();
+  /** Known codes get their sentence, anything else the short notice; the raw message stays in the details. */
+  _errorHint(error) {
     const known = ["not_found","ambiguous_instance","unsupported_service","unauthorized","timeout","write_timeout"].includes(error?.code);
+    return known ? this._errorText(error) : this._t().fehler_kurz;
+  }
+
+  /** An error next to content (operation, dialog, draft): a notice, the view stays. */
+  _errorMarkup(error, heading) {
+    const t = this._t();
     return `<div class="notice problem" role="alert"><div>${escapeHtml(heading || t.fehler_allgemein)}</div>
-      <div>${escapeHtml(known ? this._errorText(error) : t.fehler_kurz)}</div>
-      ${retry ? `<button class="act-retry quiet">${escapeHtml(t.erneut)}</button>` : ""}
+      <div>${escapeHtml(this._errorHint(error))}</div>
       <details><summary>${escapeHtml(t.details)}</summary><pre>${escapeHtml(error?.message || String(error || ""))}</pre></details></div>`;
+  }
+
+  /**
+   * A view state (M27): BuschUI.stateBlock, the shared block of all card families
+   * (icon, title, hint, optional action; role=status or role=alert from creation).
+   * The block is built as DOM and enters the card markup as outerHTML, like the
+   * head. The retry button keeps its class `act-retry`; `_render` binds it.
+   * `detail` goes into closed technical details below the block's text.
+   */
+  _stateMarkup(kind, title, { hint, icon, retry = false, detail } = {}) {
+    const t = this._t();
+    const action = retry
+      ? { node: Object.assign(document.createElement("button"), { className: "act-retry" }), label: t.erneut, text: t.erneut }
+      : undefined;
+    const node = BuschUI.stateBlock({ kind, title, hint, icon: ARR_STATE_ICONS[icon], action });
+    if (detail) {
+      const details = document.createElement("details"), summary = document.createElement("summary"), pre = document.createElement("pre");
+      summary.textContent = t.details;
+      pre.textContent = detail;
+      details.append(summary, pre);
+      node.appendChild(details);
+    }
+    return node.outerHTML;
+  }
+
+  /** The view failed to load: error block with cause, retry and technical details. */
+  _errorState(error, heading) {
+    return this._stateMarkup("error", heading || this._t().fehler_allgemein, {
+      hint: this._errorHint(error), retry: true, detail: error?.message || String(error || ""),
+    });
   }
 
   /** Leerzustand als Entwurf, nicht als Restfläche. */
   _empty(icon, text) {
-    return `<div class="empty">${arrIcon(icon, 28)}
-      <div class="empty-text">${escapeHtml(text)}</div></div>`;
+    return this._stateMarkup("empty", text, { icon });
+  }
+
+  /** Erster Abruf läuft. */
+  _loadingState() {
+    return this._stateMarkup("loading", this._t().laden);
   }
 
   /** „Stand vor N Min." once the last successful read is older than two ticks (M34, N9.2). */
@@ -2354,10 +2384,10 @@ class ArrstackImportCardBase extends ArrstackCardBase {
   _dialogKoerper() {
     const info = this._open, t = this._t();
     if (!info) return "";
-    if (info.loading) return `<div class="dlg-text" role="status">${escapeHtml(t.pruefe)}</div>`;
+    if (info.loading) return this._stateMarkup("loading", t.pruefe);
 
     const candidates = info.candidates || [];
-    return `${info.fehler ? (info.fehler.fachlich ? this._importErrorMarkup(info.fehler,t.import_fehler) : this._errorMarkup(info.fehler,t.import_fehler,false)) : ""}<div class="dlg-text">${escapeHtml(info.parent_title || info.title || "")}</div>
+    return `${info.fehler ? (info.fehler.fachlich ? this._importErrorMarkup(info.fehler,t.import_fehler) : this._errorMarkup(info.fehler,t.import_fehler)) : ""}<div class="dlg-text">${escapeHtml(info.parent_title || info.title || "")}</div>
       <div class="dlg-sub">${escapeHtml(this._stateLabel(info))}</div>
       ${info.last_error && info.last_error!==info.fehler?.message ? this._importErrorMarkup({message:info.last_error,details:info.last_error_details},t.import_status) : ""}
       ${candidates.length ? candidates.map(candidate=>`<div class="candidate">
@@ -2586,7 +2616,7 @@ class ArrstackDownloadsCard extends ArrstackImportCardBase {
       <ha-card>
         ${this._head("download", this._headMeta())}
         ${this._message ? `<div class="notice" role="status">${escapeHtml(this._message)}</div>` : ""}
-        ${this._operationError ? this._errorMarkup(this._operationError,this._t().import_fehler,false) : ""}
+        ${this._operationError ? this._errorMarkup(this._operationError,this._t().import_fehler) : ""}
         ${this._body()}
       </ha-card>`);
     const retry = this.shadowRoot.querySelector(".act-retry");
@@ -2620,8 +2650,8 @@ class ArrstackDownloadsCard extends ArrstackImportCardBase {
 
   _body() {
     const t = this._t();
-    if (this._error) return this._errorMarkup(this._error,t.fehler_allgemein);
-    if (!this._data) return `<div class="notice" role="status">${escapeHtml(t.laden)}</div>`;
+    if (this._error) return this._errorState(this._error,t.fehler_allgemein);
+    if (!this._data) return this._loadingState();
     const items=(this._data.items || []).filter(item=>this._config.show_unknown!==false || !item.unknown);
     if (!items.length) return this._empty("download",t.leer);
     const pageSize=Math.max(1,Math.min(200,Number(this._config.max_items)||10));
@@ -2720,9 +2750,9 @@ class ArrstackRecentCard extends ArrstackCardBase {
   _body() {
     const t = this._t();
     if (this._error) {
-      return this._errorMarkup(this._error,t.fehler_allgemein);
+      return this._errorState(this._error,t.fehler_allgemein);
     }
-    if (!this._data) return `<div class="notice">${escapeHtml(t.laden)}</div>`;
+    if (!this._data) return this._loadingState();
     const items = (this._data.items || []).slice(0, Number(this._config.max_items) || 8);
     if (!items.length) {
       return this._empty("film", t.leer);
@@ -2837,7 +2867,7 @@ class ArrstackFixCard extends ArrstackImportCardBase {
     patchQueueMarkup(this.shadowRoot, `<style>${ARRSTACK_STYLES}${ARRSTACK_COMPACT}</style><ha-card>
       ${this._head("download", items.length ? fuelle(t.offen, {n:items.length}) : "", "warning")}
       ${this._message ? `<div class="notice" role="status">${escapeHtml(this._message)}</div>` : ""}
-      ${this._operationError ? this._errorMarkup(this._operationError,t.import_fehler,false) : ""}
+      ${this._operationError ? this._errorMarkup(this._operationError,t.import_fehler) : ""}
       ${this._body(visible)}
       ${pages > 1 ? `<div class="import-toolbar">
         <button class="act-prev quiet" ${this._page===0 ? "disabled" : ""}>${escapeHtml(t.vorherige)}</button>
@@ -2853,8 +2883,8 @@ class ArrstackFixCard extends ArrstackImportCardBase {
   }
 
   _body(items) {
-    if (this._error) return this._errorMarkup(this._error, this._t().import_status);
-    if (!this._data) return `<div class="notice" role="status">${escapeHtml(this._t().laden)}</div>`;
+    if (this._error) return this._errorState(this._error, this._t().import_status);
+    if (!this._data) return this._loadingState();
     if (!items.length) return this._empty("check", this._t().leer);
     return `<div class="rows">${items.map(item => this._row(item)).join("")}</div>`;
   }
@@ -3025,9 +3055,9 @@ class ArrstackSeerCard extends ArrstackCardBase {
   _body() {
     const t = this._t();
     if (this._error) {
-      return this._errorMarkup(this._error, t.fehler_suche);
+      return this._errorState(this._error, t.fehler_suche);
     }
-    if (this._searching || this._opening) return `<div class="notice" role="status">${escapeHtml(t.laden)}</div>`;
+    if (this._searching || this._opening) return this._loadingState();
     if (this._results === null) {
       return this._empty("search", t.leer);
     }
@@ -3076,7 +3106,7 @@ class ArrstackSeerCard extends ArrstackCardBase {
         </button>`;
       })
       .join("");
-    return `${this._requestError ? this._errorMarkup(this._requestError, t.fehler_allgemein,false) : ""}
+    return `${this._requestError ? this._errorMarkup(this._requestError, t.fehler_allgemein) : ""}
       ${seasons.length ? `<div class="seasons">${chips}</div>` : ""}`;
   }
 
