@@ -329,3 +329,52 @@ test("M28: the dialog uses the shared anatomy: X left in the head, title, conten
   assert.ok(html.indexOf("busch-dialog-close") < html.indexOf("busch-dialog-title"), "X before the title");
   assert.ok(html.indexOf('data-akt="cancel"') < html.indexOf('data-akt="delete"'), "Abbrechen left of the final action");
 });
+
+/* ── M59: one row raster, real buttons, status with a symbol ───────────── */
+
+test("M59: recent, import and search rows share one structure: poster, then everything in .row-main", () => {
+  const parts = fullMarkup();
+  for (const where of ["recent", "fix", "seer"]) {
+    const html = parts[where].slice(parts[where].indexOf('<div class="rows">'));
+    const rows = html.split(/<div class="row(?=[ "])/).slice(1);
+    assert.ok(rows.length, `${where}: rows rendered`);
+    for (const row of rows) {
+      const body = row.slice(row.indexOf(">") + 1);
+      const main = body.indexOf('<div class="row-main">');
+      assert.ok(main > 0, `${where}: row-main after the poster: ${row}`);
+      assert.ok(/^\s*(?:<img class="poster"[^>]*>)?\s*<div class="poster[^"]*"/.test(body), `${where}: the poster comes first: ${body.slice(0, 120)}`);
+      assert.ok(!/class="row-side"/.test(row), `${where}: no side column`);
+    }
+  }
+  assert.ok(/<div class="row-meta split"><span class="meta-text">2026 · WEB<\/span><span class="meta-time">/.test(parts.recent), "the time is part of the meta line");
+  assert.ok(/<div class="row-main">[\s\S]*<div class="actions">/.test(parts.fix), "import actions belong to the row's main column");
+  assert.ok(/<div class="row-main">[\s\S]*class="status-badge/.test(parts.seer), "search status belongs to the main column");
+});
+
+test("M59: the CSS has one row raster and the queue fields stop before the action column", () => {
+  const row = (OWN.match(/\n {2}\.row \{([^}]*)\}/) || [])[1] || "";
+  assert.match(row, /display:\s*grid/);
+  assert.match(row, /grid-template-columns:\s*auto minmax\(0,\s*1fr\)/);
+  assert.ok(!/\.row\.result\s*\{[^}]*grid-template-columns|\.import-row\s*\{[^}]*grid-template-columns/.test(OWN), "no second raster for search or import rows");
+  assert.ok(!/\.queue-fields\s*\{[^}]*grid-column:\s*2\s*\/\s*-1/.test(OWN), "queue fields do not run under the action column");
+  assert.ok(!/padding-inline-end:\s*calc\(var\(--queue-action\)/.test(OWN), "no padding trick for the action column");
+});
+
+test("M59: every status chip carries a symbol, the selection has a visible label", () => {
+  const parts = fullMarkup();
+  for (const where of ["downloads", "fix", "seer"]) {
+    const chips = parts[where].match(/<span class="status-badge[^>]*>[\s\S]*?<span class="lbl">/g) || [];
+    assert.ok(chips.length, `${where}: status chips`);
+    for (const chip of chips) assert.ok(/<svg class="icon"/.test(chip), `${where}: chip without symbol: ${chip}`);
+  }
+  const select = (parts.fix.match(/<label class="select-label">[\s\S]*?<\/label>/) || [""])[0];
+  assert.match(select, /<span class="lbl">Auswählen<\/span>/, "visible label text");
+  assert.match(select, /aria-label="Auswählen: /, "the accessible name contains the visible label (WCAG 2.5.3)");
+});
+
+test("M59: the render fixtures write German umlauts, no ASCII transliterations", () => {
+  for (const file of ["render.py", "visual-contract.py", "compact-contract.py"]) {
+    const text = fs.readFileSync(path.join(__dirname, "..", "docs", "render", file), "utf8");
+    assert.deepEqual(text.match(/ungewoehnlich|ausserordentlich|laenger|Veroeffentlich|aussergewoehnlich/g) || [], [], file);
+  }
+});

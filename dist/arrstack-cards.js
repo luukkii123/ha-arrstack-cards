@@ -422,6 +422,10 @@ const ARR_ICON_PATHS = {
   listPlus: '<path d="M11 12H3"/><path d="M16 6H3"/><path d="M16 18H3"/><path d="M18 9v6"/><path d="M21 12h-6"/>',
   close: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
   info: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>',
+  circleAlert: '<circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/>',
+  clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+  help: '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/>',
+  unplug: '<path d="m19 5 3-3"/><path d="m2 22 3-3"/><path d="M6.3 20.3a2.4 2.4 0 0 0 3.4 0L12 18l-6-6-2.3 2.3a2.4 2.4 0 0 0 0 3.4Z"/><path d="M7.5 13.5 10 11"/><path d="M10.5 16.5 13 14"/><path d="m12 6 6 6 2.3-2.3a2.4 2.4 0 0 0 0-3.4l-2.6-2.6a2.4 2.4 0 0 0-3.4 0Z"/>',
   jellyfish:
     '<path d="M4 12a8 8 0 0 1 16 0"/><path d="M4 12h16"/>' +
     '<path d="M7.5 12c0 2.5-1.5 3.5-1.5 5.5S7 20 7 20"/>' +
@@ -826,6 +830,7 @@ const TEXTE_ARRSTACK_FIX_CARD = {
       auswahl_noetig: 'Auswahl nötig',
       bulk: 'Bereite importieren',
       auswahl_importieren: 'Auswahl importieren',
+      auswaehlen: 'Auswählen',
       ausgewaehlt: '{n} ausgewählt',
       uebermittelt: '{n} Importauftrag/-aufträge übermittelt.',
       teilfehler: '{n} Eintrag/Einträge fehlgeschlagen. Bitte Details prüfen.',
@@ -879,6 +884,7 @@ const TEXTE_ARRSTACK_FIX_CARD = {
       auswahl_noetig: 'Selection required',
       bulk: 'Import ready',
       auswahl_importieren: 'Import selected',
+      auswaehlen: 'Select',
       ausgewaehlt: '{n} selected',
       uebermittelt: '{n} import command(s) submitted.',
       teilfehler: '{n} item(s) failed. Please check details.',
@@ -1068,7 +1074,7 @@ const ARRSTACK_TOKENS = `
  * Container über seinen Elternteil hinaus, statt zu kürzen.
  */
 const ARRSTACK_EINZEILIG = `
-  .head-meta, .row-title, .row-meta, .row-side .lead, .row-side .sub,
+  .head-meta, .row-title, .row-meta,
   .lbl, .dlg-title {
     overflow: hidden;
     text-overflow: ellipsis;
@@ -1139,14 +1145,19 @@ const ARRSTACK_GEMEINSAM = `
      den Takt. Eine graue Fläche je Zeile ergab eine Leiter aus Balken — der
      häufigste Grund, warum solche Karten gebastelt aussehen. */
   .rows { display: flex; flex-direction: column; gap: var(--arr-space-3); }
+  /* Ein Zeilenraster für alle Listen (M59): links das Poster, rechts eine
+     Spalte mit allem Übrigen — Titel, Meta (samt Zeit), Fortschritt, Status,
+     Hinweise und Aktionen. So steht kein Poster über seinem Titel und keine
+     Zeit als eigene Zeile darunter, auch bei 320 px nicht. */
   .row {
-    display: flex;
-    align-items: center;
-    gap: var(--arr-space-3);
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+    column-gap: var(--arr-space-3);
     border-radius: var(--arr-radius-1);
   }
-  .row.wrap { flex-wrap: wrap; }
-  .row-main { flex: 1 1 auto; min-width: 0; }
+  .row > .poster { grid-column: 1; }
+  .row-main { grid-column: 2; min-width: 0; }
   /* Regel 1, Prüfung 1 misst scrollHeight gegen clientHeight. Ein
      zweizeiliger Klemmkasten (-webkit-line-clamp) meldet dort die volle
      Inhaltshöhe und gilt als Überlauf — Dateinamen aus dem Usenet werden
@@ -1160,27 +1171,14 @@ const ARRSTACK_GEMEINSAM = `
     color: var(--arr-muted);
     margin-top: var(--arr-space-1);
   }
-  .row-side {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: var(--arr-space-1);
-    flex: 0 1 auto;
-    min-width: 0;
-    max-width: 45%;
-  }
-  /* In einer Spalte mit align-items: flex-end wächst ein Kind über den
-     Container hinaus — nach links, mitten in die Textspalte daneben. Bei
-     480 px hat genau das die Restzeit über den Zustand geschoben (gemessen
-     am 09.09.2026: 6,2 px Überdeckung). max-width bindet es an den
-     Container, und die Kürzung greift statt des Überstands. */
-  .row-side > * { max-width: 100%; text-align: right; }
-  .row-side .lead {
-    font-size: var(--arr-font-md);
-    color: var(--arr-text);
-    font-variant-numeric: tabular-nums;
-  }
-  .row-side .sub { font-size: var(--arr-font-sm); color: var(--arr-muted); }
+  /* Meta mit Zeitpunkt: die Zeit steht am Ende derselben Zeile und kürzt
+     zuletzt; davor kürzt die übrige Auskunft. */
+  .row-meta.split { display: flex; gap: var(--arr-space-2); }
+  .row-meta.split > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row-meta.split > .meta-text { flex: 0 1 auto; }
+  .row-meta.split > .meta-time { flex: 0 0 auto; max-width: 100%; margin-inline-start: auto; font-variant-numeric: tabular-nums; }
+  .row-main > .status-badge { margin-top: var(--arr-space-2); }
+  .row-main > .actions { margin-top: var(--arr-space-2); }
 
   .poster {
     width: var(--arr-poster-w);
@@ -1275,8 +1273,6 @@ const ARRSTACK_STYLES = BuschUI.cardStyles + ARRSTACK_TOKENS + ARRSTACK_EINZEILI
   @container (max-width: 440px) {
     .head { grid-template-columns: minmax(0, 1fr); gap: var(--arr-space-2); }
     .head-side { grid-column: 1; justify-self: start; margin-inline-start: calc(var(--arr-media) + var(--arr-space-2)); }
-    .row { flex-wrap: wrap; }
-    .row-side { flex: 1 1 100%; max-width: 100%; flex-direction: row; align-items: center; justify-content: space-between; }
     .actions { flex: 1 1 100%; width: 100%; }
   }
 `;
@@ -1307,11 +1303,6 @@ const ARRSTACK_COMPACT = `
   details summary { color: var(--arr-text); }
   .head-media { width: 44px; height: 44px; }
   .poster { width: var(--arr-thumb); height: calc(var(--arr-thumb) * 1.5); }
-  .row.result { display: grid; grid-template-columns: auto minmax(0,1fr); gap: var(--arr-space-2); }
-  .row.result > .status-badge { grid-column: 2; justify-self: start; margin-top: calc(-1 * var(--arr-space-2)); }
-  .import-row { display: grid; grid-template-columns: auto minmax(0,1fr); gap: var(--arr-space-2); }
-  .import-row > .actions { grid-column: 2; width: auto; }
-  .import-row .status-badge { margin-top: var(--arr-space-2); }
   .import-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--arr-space-2); margin: var(--arr-space-3) 0; }
   .select-label { display: inline-flex; align-items: center; gap: var(--arr-space-2); min-height: 44px; cursor: pointer; }
   input[type=checkbox], input[type=radio] { accent-color: var(--arr-accent); }
@@ -1323,7 +1314,6 @@ const ARRSTACK_COMPACT = `
   @container (max-width: 440px) {
     .head { grid-template-columns: minmax(0,1fr) auto; }
     .head-side { grid-column: auto; margin-inline-start: 0; }
-    .row.result { flex-wrap: nowrap; }
   }
   @media (prefers-reduced-motion: reduce) { .bar > i { transition: none; } }
 `;
@@ -1999,11 +1989,13 @@ function seerTone(status) {
 
 /** Status semantics → tone of the shared chip (M62); neutral and unknown stay untinted. */
 const ARR_CHIP_TONES = { success: "success", warning: "warning", error: "error", unavailable: "error" };
+/** Status symbol per semantics (M59): meaning never by colour alone (R17). */
+const ARR_CHIP_ICONS = { success: "check", warning: "alert", error: "circleAlert", unavailable: "unplug", neutral: "clock", unknown: "help" };
 
 /** A status as BuschUI chip: tint carries the meaning, the text keeps the text colour (M62, M26). */
 function statusChip(tone, text, extra = "") {
   const chipTone = ARR_CHIP_TONES[tone];
-  return `<span class="status-badge busch-chip${extra} ${tone}"${chipTone ? ` data-tone="${chipTone}"` : ""} title="${escapeHtml(text)}"><span class="lbl">${escapeHtml(text)}</span></span>`;
+  return `<span class="status-badge busch-chip${extra} ${tone}"${chipTone ? ` data-tone="${chipTone}"` : ""} title="${escapeHtml(text)}">${arrIcon(ARR_CHIP_ICONS[tone] || "help", 14)}<span class="lbl">${escapeHtml(text)}</span></span>`;
 }
 
 const ARR_NOTICE_ICONS = { info: "info", warning: "alert", error: "alert" };
@@ -2527,9 +2519,10 @@ const ARRSTACK_DOWNLOADS_STYLES = `
     .queue-value { white-space:normal; overflow-wrap:anywhere; }
     .queue-cell[data-column=title] .queue-value { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
     .queue-reasons { grid-column:2 / -1; }
-    .queue-table:not(.expanded) .queue-fields { display:flex;flex-wrap:wrap;align-items:center;gap:var(--arr-space-2);grid-column:2 / -1;grid-row:1;min-width:0; }
+    /* M59: the fields stay in the content column; the action column keeps the check button alone. */
+    .queue-table:not(.expanded) .queue-fields { display:flex;flex-wrap:wrap;align-items:center;gap:var(--arr-space-2);grid-column:2;grid-row:1;min-width:0; }
     .queue-table:not(.expanded) .queue-cell { display:flex;align-items:center;gap:var(--arr-space-1);flex:0 1 auto;max-width:100%; }
-    .queue-table:not(.expanded) .queue-cell[data-column=title] { flex:1 1 100%;min-height:var(--queue-action);padding-inline-end:calc(var(--queue-action) + var(--arr-space-2));box-sizing:border-box; }
+    .queue-table:not(.expanded) .queue-cell[data-column=title] { flex:1 1 100%;min-height:var(--queue-action); }
     .queue-table:not(.expanded) .queue-cell[data-column=progress] { flex:1 1 100%; }
     .queue-table:not(.expanded) .queue-cell[data-column=status] .queue-label,
     .queue-table:not(.expanded) .queue-cell[data-column=progress] .queue-label { display:none; }
@@ -2723,12 +2716,9 @@ class ArrstackRecentCard extends ArrstackCardBase {
           ${posterMarkup(item.poster, this._data && this._data.brand)}
           <div class="row-main">
             <div class="row-title">${escapeHtml(item.title || "")}</div>
-            <div class="row-meta">${escapeHtml(
+            <div class="row-meta split"><span class="meta-text">${escapeHtml(
               [item.subtitle, item.quality].filter(Boolean).join(" · ")
-            )}</div>
-          </div>
-          <div class="row-side">
-            <span class="sub">${escapeHtml(formatSince(item.added, t))}</span>
+            )}</span><span class="meta-time">${escapeHtml(formatSince(item.added, t))}</span></div>
           </div>
         </div>`
       )
@@ -2835,7 +2825,7 @@ class ArrstackFixCard extends ArrstackImportCardBase {
         <button class="act-next busch-btn" data-variant="secondary" ${this._page===pages-1 ? "disabled" : ""}>${escapeHtml(t.naechste)}</button>
       </div>` : ""}
       ${items.length ? `<div class="import-toolbar">
-        <button class="act-bulk busch-btn" data-variant="secondary" ${this._busy || !ready.length ? "disabled" : ""}>${arrIcon("download")}<span class="lbl">${escapeHtml(t.bulk)}</span></button>
+        <button class="act-bulk busch-btn" data-variant="secondary" ${this._busy || !ready.length ? "disabled" : ""}><span class="lbl">${escapeHtml(t.bulk)}</span></button>
         <button class="act-refresh busch-btn" data-variant="secondary" ${this._loading || this._busy ? "disabled" : ""}>${escapeHtml(t.neu_laden)}</button>
         ${this._selected.size ? `<span class="busch-chip"><span class="lbl">${escapeHtml(fuelle(t.ausgewaehlt,{n:this._selected.size}))}</span></span><button class="act-selected busch-btn" data-variant="secondary" ${this._busy ? "disabled" : ""}>${escapeHtml(t.auswahl_importieren)}</button>` : ""}
       </div>` : ""}</ha-card>`);
@@ -2861,11 +2851,12 @@ class ArrstackFixCard extends ArrstackImportCardBase {
         <div class="bar" role="progressbar" aria-valuenow="${Math.max(0,Math.min(100,Number(item.progress)||0))}" aria-valuemin="0" aria-valuemax="100" aria-label="${escapeHtml(t.fortschritt || t.kartentitel)}"><i style="width:${Math.max(0,Math.min(100,Number(item.progress)||0))}%"></i></div>
         ${statusChip(complete ? (ready ? "success" : "warning") : queueTone(item), `${Math.round(Number(item.progress)||0)} % · ${status}`)}
         ${problem ? this._importErrorMarkup(problem,t.import_fehler) : ""}
-      </div>
-      <div class="actions">
-        ${ready ? `<label class="select-label"><input type="checkbox" class="item-select" aria-label="${escapeHtml(`${t.auswahl_importieren}: ${item.parent_title || item.title}`)}" ${this._selected.has(id) ? "checked" : ""} ${this._busy ? "disabled" : ""}></label><button class="act-import busch-btn" data-variant="secondary" ${this._busy ? "disabled" : ""}>${escapeHtml(t.importieren)}</button>` : ""}
-        ${complete ? `<button class="act-check busch-btn" data-variant="secondary" ${this._busy ? "disabled" : ""}>${escapeHtml(item.import_state === "selection_required" ? t.auswahl_datei : t.pruefen)}</button>` : ""}
-        <button class="act-delete busch-btn" data-variant="destructive" ${this._busy ? "disabled" : ""}>${escapeHtml(t.loeschen)}</button>
+        <div class="actions">
+          ${ready ? `<button class="act-import busch-btn" data-variant="secondary" ${this._busy ? "disabled" : ""}>${escapeHtml(t.importieren)}</button>` : ""}
+          ${complete ? `<button class="act-check busch-btn" data-variant="secondary" ${this._busy ? "disabled" : ""}>${escapeHtml(item.import_state === "selection_required" ? t.auswahl_datei : t.pruefen)}</button>` : ""}
+          ${ready ? `<label class="select-label"><input type="checkbox" class="item-select" aria-label="${escapeHtml(`${t.auswaehlen}: ${item.parent_title || item.title}`)}" ${this._selected.has(id) ? "checked" : ""} ${this._busy ? "disabled" : ""}><span class="lbl">${escapeHtml(t.auswaehlen)}</span></label>` : ""}
+          <button class="act-delete busch-btn" data-variant="destructive" ${this._busy ? "disabled" : ""}>${escapeHtml(t.loeschen)}</button>
+        </div>
       </div>
     </div>`;
   }
@@ -3040,8 +3031,8 @@ class ArrstackSeerCard extends ArrstackCardBase {
                 .filter(Boolean)
                 .join(" · ")
             )}</div>
+            ${statusChip(seerTone(item.status), statusLabel(item.status, t))}
           </div>
-          ${statusChip(seerTone(item.status), statusLabel(item.status, t))}
         </div>${this._show?.id === item.id && this._show?.media_type === item.media_type ? this._inlineMarkup() : ""}`
       )
       .join("")}</div>`;

@@ -148,6 +148,15 @@ with sync_playwright() as pw:
             page.locator('codex-arrcompact-seer-card').screenshot(path=str(output/f'seer-{width}-{theme}.png'))
             page.locator('codex-arrcompact-fix-card').screenshot(path=str(output/f'import-{width}-{theme}.png'))
             capture_card('codex-arrcompact-downloads-card',f'queue-{width}-{theme}.png')
+            # M59: in the compact queue the fields (bar, status chip) end before the action column and no chip is cut.
+            check(f'queue-grid-{width}-{theme}', '''() => [...window.__cards.downloads.shadowRoot.querySelectorAll('.queue-row')].every(row => {
+              const fields=row.querySelector('.queue-fields');if(getComputedStyle(fields).display==='contents') return true;
+              const f=fields.getBoundingClientRect(),action=row.querySelector('.queue-action button');
+              const bars=[...row.querySelectorAll('.bar')].every(bar=>bar.getBoundingClientRect().right<=f.right+0.5);
+              const clear=!action || f.right<=action.getBoundingClientRect().left+0.5;
+              const chips=[...row.querySelectorAll('.status-badge')].every(chip=>{const label=chip.querySelector('.lbl');
+                return label.scrollWidth<=label.clientWidth+1 && chip.getBoundingClientRect().right<=f.right+0.5;});
+              return bars && clear && chips;})''')
             page.evaluate("async()=>{await window.__cards.seer._openResult(window.__cards.seer._results[0]);}")
             page.wait_for_function("!!window.__cards.seer.shadowRoot.querySelector('.request-inline')")
             page.wait_for_timeout(100)

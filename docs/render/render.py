@@ -165,10 +165,10 @@ PAGE = """<!doctype html>
      Attrappen-Titel von acht Zeichen belegt gar nichts. */
   const now = Date.now();
   const ago = (h) => new Date(now - h * 3600000).toISOString();
-  const LANG = 'Beispielserie.S03E04.German.DL.1080p.WEB.h264.INTERNAL-Eine.sehr.lange.Veroeffentlichungskennung';
+  const LANG = 'Beispielserie.S03E04.German.DL.1080p.WEB.h264.INTERNAL-Eine.sehr.lange.Veröffentlichungskennung';
 
   const QUEUE = [
-    { id: 1, download_id: 'a1', title: LANG, parent_title: 'Beispielserie mit einem ungewoehnlich langen Namen',
+    { id: 1, download_id: 'a1', title: LANG, parent_title: 'Beispielserie mit einem ungewöhnlich langen Namen',
       episode: 'S03E04', poster: null, size: 2.4e9, sizeleft: 6.1e8, timeleft: '00:07:20',
       progress: 74.6, status: 'downloading', tracked_state: 'downloading', messages: [] },
     { id: 2, download_id: 'b2', title: 'Ein sehr langer Filmtitel der garantiert nicht in eine Zeile passt 2026',
@@ -178,7 +178,7 @@ PAGE = """<!doctype html>
     { id: 3, download_id: 'c3', title: 'Kurzfilm.2024.720p', parent_title: 'Kurzfilm',
       episode: null, poster: null, size: 9.0e8, sizeleft: 0, timeleft: null,
       progress: 100, status: 'completed', tracked_state: 'importing', messages: [] },
-    { id:41, title:LANG, parent_title:'Beispielserie mit einem ungewoehnlich langen Namen',
+    { id:41, title:LANG, parent_title:'Beispielserie mit einem ungewöhnlich langen Namen',
       episode:'S01E09',poster:null,size:2.1e9,sizeleft:0,timeleft:null,
       progress:100,status:'completed',tracked_status:'warning',tracked_state:'importBlocked',is_problem:true,messages:[] },
   ];
@@ -194,7 +194,7 @@ PAGE = """<!doctype html>
   ];
 
   const RECENT = [
-    { id: 1, title: 'Beispielserie mit einem ungewoehnlich langen Namen', subtitle: 'S03E03',
+    { id: 1, title: 'Beispielserie mit einem ungewöhnlich langen Namen', subtitle: 'S03E03',
       added: ago(2), quality: 'WEBDL-1080p', poster: null },
     { id: 2, title: 'Ein Film mit langem Titel', subtitle: '2025', added: ago(27),
       quality: 'Bluray-1080p', poster: null },
@@ -203,16 +203,16 @@ PAGE = """<!doctype html>
   ];
 
   const SEARCH = [
-    { id: 1399, media_type: 'tv', title: 'Beispielserie mit einem ungewoehnlich langen Namen',
+    { id: 1399, media_type: 'tv', title: 'Beispielserie mit einem ungewöhnlich langen Namen',
       date: '2011-04-17', poster: null, status: 'partially_available', status_code: 4 },
     { id: 550, media_type: 'movie', title: 'Beispielfilm', date: '1999-10-15',
       poster: null, status: 'unknown', status_code: 1 },
-    { id: 66732, media_type: 'tv', title: 'Serie mit einem ausserordentlich langen Titel, der nirgends hineinpasst',
+    { id: 66732, media_type: 'tv', title: 'Serie mit einem außerordentlich langen Titel, der nirgends hineinpasst',
       date: '2016-07-15', poster: null, status: 'available', status_code: 5 },
   ];
 
   const SEASONS = {
-    id: 1399, title: 'Beispielserie mit einem ungewoehnlich langen Namen', poster: null,
+    id: 1399, title: 'Beispielserie mit einem ungewöhnlich langen Namen', poster: null,
     status: 'partially_available',
     seasons: [
       { season: 0, name: 'Specials', episodes: 3, specials: true, status: 'unknown', status_code: 1 },
@@ -304,6 +304,7 @@ time.sleep(1.5)
 requests, responses, failures, console, errors = [], [], [], [], []
 probe = {}
 ui_ohne_tokens = ui_mit_tokens = selbst = None
+zeilenraster = {}
 popups = {}
 ui_dialog = {}
 eigen = {}
@@ -383,7 +384,7 @@ try:
             const t = window.__cards.fix._t();
             window.__cards.fix._message = t.gesperrt.replace('{grund}',
               'unknownSeries; Keine Serie und kein Film zugeordnet, und dieser '
-              + 'Hinweis ist absichtlich laenger als jede Kartenbreite');
+              + 'Hinweis ist absichtlich länger als jede Kartenbreite');
             window.__cards.fix._render();
         }""")
         page.wait_for_timeout(400)
@@ -405,6 +406,40 @@ try:
                 page.evaluate("(t) => { document.documentElement.dataset.theme = t; }", thema)
                 page.wait_for_timeout(250)
                 page.screenshot(path=str(OUT / f"alle-{breite}-{thema}.png"), full_page=True)
+
+        # ── M59: ein Zeilenraster, gemessen ──────────────────────────────────
+        # Je Liste (Zuletzt, Import, Suche) und Breite: das Poster steht links
+        # neben der Hauptspalte, nie darüber; die Zeit der Zuletzt-Liste steht
+        # sichtbar in der Metazeile ihrer Zeile; jede Zeilenaktion misst 44 px.
+        for breite in (320, 390, 480, 960):
+            page.set_viewport_size({"width": breite, "height": 1200})
+            page.wait_for_timeout(150)
+            zeilenraster[str(breite)] = page.evaluate("""() => {
+              const out = {zeilen: 0, verstoesse: []};
+              for (const name of ['recent', 'fix', 'seer']) {
+                for (const row of window.__cards[name].shadowRoot.querySelectorAll('.rows > .row')) {
+                  out.zeilen++;
+                  const id = name + ':' + (row.dataset.item || row.dataset.index || out.zeilen);
+                  const poster = [...row.children].find(el => el.classList.contains('poster') && el.getClientRects().length);
+                  const main = row.querySelector(':scope > .row-main');
+                  if (getComputedStyle(row).display !== 'grid') out.verstoesse.push(id + ': kein Raster');
+                  if (!poster || !main) { out.verstoesse.push(id + ': Poster oder Hauptspalte fehlt'); continue; }
+                  const p = poster.getBoundingClientRect(), m = main.getBoundingClientRect();
+                  if (m.left < p.right) out.verstoesse.push(id + ': Hauptspalte nicht rechts vom Poster');
+                  if (m.top > p.top + 1) out.verstoesse.push(id + ': Hauptspalte unter dem Poster');
+                  if (name === 'recent') {
+                    const time = row.querySelector('.row-meta .meta-time');
+                    if (!time) { out.verstoesse.push(id + ': Zeit nicht in der Metazeile'); continue; }
+                    if (time.getBoundingClientRect().right > m.right + 0.5 || time.scrollWidth > time.clientWidth + 1)
+                      out.verstoesse.push(id + ': Zeit abgeschnitten');
+                  }
+                  for (const act of row.querySelectorAll('.actions > button, .actions > label'))
+                    if (act.getBoundingClientRect().height < 44) out.verstoesse.push(id + ': Aktion unter 44 px: ' + act.className);
+                }
+              }
+              return out;
+            }""")
+        page.set_viewport_size({"width": WIDTH, "height": 1200})
 
         # ── Gegenprobe: schlägt die Messung überhaupt an? ────────────────────
         page.set_viewport_size({"width": WIDTH, "height": 1200})
@@ -723,6 +758,7 @@ report = {
     "ui_selbsttest": selbst,
     "ui_popups": popups,
     "eigene_pruefungen": eigen,
+    "zeilenraster": zeilenraster,
 }
 (OUT / "report.json").write_text(
     json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8"
@@ -795,6 +831,10 @@ for karte, befund in eigen.get("editoren", {}).items():
         schlecht = 1
     if not befund["labelOhnePunkt"]:
         print("FEHLER: %s — ein Label endet mit einem Punkt." % karte)
+        schlecht = 1
+for breite, befund in zeilenraster.items():
+    if not befund["zeilen"] or befund["verstoesse"]:
+        print("FEHLER: M59 Zeilenraster bei %s px: %s" % (breite, befund["verstoesse"] or "keine Zeilen gemessen"))
         schlecht = 1
 if report["page_errors"] or report["console_errors"]:
     print("FEHLER: Die Seite hat Fehler protokolliert.")

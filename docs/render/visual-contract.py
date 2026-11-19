@@ -78,7 +78,7 @@ try:
           await window.__cards.seer._search('beispiel');
           const fix = window.__cards.fix;
           fix._message = fix._t().gesperrt.replace('{grund}',
-            'unknownSeries; Keine Serie und kein Film zugeordnet, und dieser Hinweis ist absichtlich laenger als jede Kartenbreite');
+            'unknownSeries; Keine Serie und kein Film zugeordnet, und dieser Hinweis ist absichtlich länger als jede Kartenbreite');
           fix._render();
           const wrap=document.getElementById('wrap');wrap.style.maxWidth='none';wrap.style.width='auto';
         }""")
