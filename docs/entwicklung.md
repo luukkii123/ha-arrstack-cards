@@ -68,7 +68,10 @@ Weitere Skripte in `docs/render/`:
   PNG-Baselines in `docs/render/baselines/ui-0.1.0/` (Editorbilder nutzen eine
   `ha-form`-Attrappe).
 - `compact-contract.py <bundle> <ausgabe> [zugangsdaten.json]` prüft die
-  kompakte Queue und Importdialoge.
+  kompakte Queue und Importdialoge. Mit `regeln.py` misst es auf der
+  Attrappenseite Kontrast und Touchziele der Karten und Dialoge
+  (`compact-report.json`, Bereiche `kontrast`/`touch`, Verstoß = Exit 1);
+  ohne `regeln.py` (Repo-CI) stehen beide als `kein_urteil` (M26).
 - `live-ha-native.py <bundle> <zugangsdaten.json> <dashboard> <ausgabe>` prüft
   die echten `ha-form`-Editoren in einem laufenden Home Assistant mit einem
   vorübergehenden, versteckten Admin-Testdashboard

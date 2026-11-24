@@ -26,6 +26,18 @@ except ImportError:
     regeln = None
     print('ha-icon-Attrappe: NICHT geprueft - regeln.py fehlt (Repo-CI ohne /work)')
 KEIN_URTEIL = {'kein_urteil': 'regeln.py nicht gefunden - ha-icon-Attrappe nicht geprueft'}
+# M26 (W10): contrast (text 4.5:1, large text 3:1, icons 3:1) and touch targets (44 px) with the shared module
+# hacs/scripts/kontrast_touch.py via regeln.messe_kontrast_touch_hier, on the synthetic page only (like the ha-icon
+# stand-in). Same report form as regeln.messe_kontrast_touch: per area `laeufe` with width, theme and host.
+# Without regeln.py (repo CI) or on the native host both areas carry a kein_urteil instead of a verdict.
+AUSNAHMEN = Path(__file__).resolve().with_name('kontrast-ausnahmen.json')
+KT_ZIELE = {'seer': 'codex-arrcompact-seer-card', 'fix': 'codex-arrcompact-fix-card', 'downloads': 'codex-arrcompact-downloads-card'}
+MISST_KT = bool(regeln) and len(sys.argv) <= 3
+if MISST_KT:
+    kontrast_touch = {bereich: {'ausnahmen_datei': None, 'laeufe': []} for bereich in ('kontrast', 'touch')}
+else:
+    kontrast_touch = {bereich: {'kein_urteil': 'regeln.py nicht gefunden (Repo-CI)' if not regeln
+                                else 'nativer Host: Kontrast/Touch nur auf der Attrappenseite'} for bereich in ('kontrast', 'touch')}
 
 bundle, output = Path(sys.argv[1]), Path(sys.argv[2])
 output.mkdir(parents=True, exist_ok=True)
@@ -120,6 +132,13 @@ with sync_playwright() as pw:
         value=page.evaluate(expression)
         reports.append({'name':name,'passed':bool(value)})
         if not value: raise AssertionError(name)
+    def messe_kt(name, selector, width, theme):
+        # M26: one host in its current state; the lists kontrast_verstoesse/touch_verstoesse are counted by regeln.bewerte.
+        if not MISST_KT:
+            return
+        for bereich, wert in regeln.messe_kontrast_touch_hier(page, selector, ausnahmen=AUSNAHMEN).items():
+            kontrast_touch[bereich]['ausnahmen_datei'] = wert.pop('ausnahmen_datei', None)
+            kontrast_touch[bereich]['laeufe'].append({'breite': width, 'thema': theme, 'karte': name, **wert})
     def close():
         page.evaluate("document.querySelector('codex-arrcompact-dialog')?.close(true)")
         page.wait_for_timeout(350)
@@ -160,6 +179,8 @@ with sync_playwright() as pw:
             page.wait_for_timeout(100)
             check(f'overflow-{width}-{theme}', '''() => Object.values(window.__cards).every(card=>card.getBoundingClientRect().right<=innerWidth && card.scrollWidth<=card.clientWidth+1)''')
             check(f'touch-{width}-{theme}', '''() => Object.values(window.__cards).every(card=>[...card.shadowRoot.querySelectorAll('button')].filter(node=>node.getClientRects().length).every(node=>node.getBoundingClientRect().height>=44))''')
+            for name, selector in KT_ZIELE.items():
+                messe_kt(name, selector, width, theme)
             page.locator('codex-arrcompact-seer-card').screenshot(path=str(output/f'seer-{width}-{theme}.png'))
             page.locator('codex-arrcompact-fix-card').screenshot(path=str(output/f'import-{width}-{theme}.png'))
             capture_card('codex-arrcompact-downloads-card',f'queue-{width}-{theme}.png')
@@ -193,6 +214,7 @@ with sync_playwright() as pw:
             page.wait_for_function('!!window.__cards.fix._open?.candidates?.length')
             check(f'candidate-compact-{width}-{theme}',"() => {const s=document.querySelector('codex-arrcompact-dialog').shadowRoot.querySelector('.sheet');const r=s.getBoundingClientRect();return r.height<innerHeight && r.width<=innerWidth && r.top>=0 && r.bottom<=innerHeight;}")
             page.locator('codex-arrcompact-dialog').screenshot(path=str(output/f'candidates-{width}-{theme}.png'))
+            messe_kt('dialog', 'codex-arrcompact-dialog', width, theme)
             page.locator('codex-arrcompact-dialog .scrim').click(position={'x':4,'y':4})
             check(f'candidate-scrim-{width}-{theme}',"() => !!document.querySelector('codex-arrcompact-dialog')")
             page.locator('codex-arrcompact-dialog .candidate-radio').first.check()
@@ -462,7 +484,15 @@ with sync_playwright() as pw:
     rejections=page.evaluate("window.__rejections || []")
     ha_icon=(regeln.ha_icon_fehlend(page) if regeln else KEIN_URTEIL) if len(sys.argv)<=3 else None  # M79: active, names without a path
     browser.close()
-(output/'compact-report.json').write_text(json.dumps({'native_host':len(sys.argv)>3,'checks':reports,'captures':captures,'page_errors':errors,'blocked_http':blocked_http,'blocked_ws':blocked_ws,'unhandled_rejections':rejections,'ha_icon':ha_icon},indent=2,ensure_ascii=False))
+if MISST_KT:
+    liste = json.loads(AUSNAHMEN.read_text(encoding='utf-8')) if AUSNAHMEN.exists() else {}
+    kontrast_touch['touch']['mindest_px'] = 44
+    for bereich in ('kontrast', 'touch'):
+        benutzt = {a.get('selektor') for lauf in kontrast_touch[bereich]['laeufe'] for a in lauf.get('ausnahmen', [])}
+        kontrast_touch[bereich]['ungenutzte_ausnahmen'] = [a['selektor'] for a in liste.get(bereich, []) if a['selektor'] not in benutzt]
+(output/'compact-report.json').write_text(json.dumps({'native_host':len(sys.argv)>3,'checks':reports,'captures':captures,'page_errors':errors,'blocked_http':blocked_http,'blocked_ws':blocked_ws,'unhandled_rejections':rejections,'ha_icon':ha_icon,'kontrast':kontrast_touch['kontrast'],'touch':kontrast_touch['touch']},indent=2,ensure_ascii=False))
 print(json.dumps({'checks':len(reports),'all_passed':all(item['passed'] for item in reports),'page_errors':len(errors),'blocked_http':len(blocked_http),'blocked_ws':len(blocked_ws),'unhandled_rejections':len(rejections)}))
 assert not errors and not rejections
 assert len(sys.argv)>3 or not regeln or (ha_icon['aktiv'] and not ha_icon['fehlend']),ha_icon
+if MISST_KT and (not kontrast_touch['kontrast']['laeufe'] or regeln.bewerte(kontrast_touch)):
+    sys.exit('M26: Kontrast/Touch-Verstoss oder nichts gemessen, siehe compact-report.json (kontrast/touch)')
