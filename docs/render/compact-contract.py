@@ -67,6 +67,7 @@ fixture = fixture.replace("case 'arrstack/refresh_import_queue':\n", "case 'arrs
 fixture = fixture.replace("case 'arrstack/import_ready':\n", "case 'arrstack/import_ready':\n")
 source = bundle.read_text().replace('arrstack-', 'codex-arrcompact-')
 reports=[]
+dialog_regel1={}  # M76: Regel 1 (regeln.messe_text) on the visible sheet of queue-dialog-error at 360/390
 captures=[]
 errors=[]
 blocked_http=[]
@@ -166,15 +167,19 @@ with sync_playwright() as pw:
         page.set_viewport_size(old_viewport)
         page.evaluate("()=>{const saved=window.__capture;for(const [node,display] of saved.children)node.style.display=display;window.__mount.style.cssText=saved.css;window.__mount.scrollTop=saved.scroll;delete window.__capture;}")
 
+    def ansicht(width, theme):
+        # Viewport, colour scheme and theme (native host: HA theme tokens on the mount).
+        page.set_viewport_size({'width':width,'height':1100})
+        page.emulate_media(color_scheme=theme)
+        page.evaluate("theme=>{document.documentElement.dataset.theme=theme;document.querySelector('home-assistant')?.style.setProperty('color-scheme',theme);}",theme)
+        if len(sys.argv)>3:
+            page.evaluate('''theme=>{const mount=window.__mount;
+              const tokens=theme==='light'?{'--primary-text-color':'#212121','--secondary-text-color':'#727272','--card-background-color':'#fff','--primary-background-color':'#fafafa','--divider-color':'#e0e0e0','--secondary-background-color':'#e5e5e5'}:{'--primary-text-color':'#e1e1e1','--secondary-text-color':'#9b9b9b','--card-background-color':'#1c1c1c','--primary-background-color':'#111','--divider-color':'#474747','--secondary-background-color':'#202020'};
+              for(const [key,value] of Object.entries(tokens)){mount.style.setProperty(key,value);document.body.style.setProperty(key,value);}}''',theme)
+
     for width in (320,390,480,960):
         for theme in ('light','dark'):
-            page.set_viewport_size({'width':width,'height':1100})
-            page.emulate_media(color_scheme=theme)
-            page.evaluate("theme=>{document.documentElement.dataset.theme=theme;document.querySelector('home-assistant')?.style.setProperty('color-scheme',theme);}",theme)
-            if len(sys.argv)>3:
-                page.evaluate('''theme=>{const mount=window.__mount;
-                  const tokens=theme==='light'?{'--primary-text-color':'#212121','--secondary-text-color':'#727272','--card-background-color':'#fff','--primary-background-color':'#fafafa','--divider-color':'#e0e0e0','--secondary-background-color':'#e5e5e5'}:{'--primary-text-color':'#e1e1e1','--secondary-text-color':'#9b9b9b','--card-background-color':'#1c1c1c','--primary-background-color':'#111','--divider-color':'#474747','--secondary-background-color':'#202020'};
-                  for(const [key,value] of Object.entries(tokens)){mount.style.setProperty(key,value);document.body.style.setProperty(key,value);}}''',theme)
+            ansicht(width, theme)
             page.evaluate("async()=>{window.__failSearch=false;await window.__cards.seer._search('Beispiel & ü + #');}")
             page.wait_for_timeout(100)
             check(f'overflow-{width}-{theme}', '''() => Object.values(window.__cards).every(card=>card.getBoundingClientRect().right<=innerWidth && card.scrollWidth<=card.clientWidth+1)''')
@@ -273,7 +278,8 @@ with sync_playwright() as pw:
         check('queue-editor-echo-focus',"() => {const e=window.__editor;return e.getRootNode().activeElement===e._order.querySelector('[data-column=status][data-move=\"1\"]');}")
         page.keyboard.press('Space')
         check('queue-editor-space-order',"() => window.__editor._config.columns[1]==='status'")
-        for width in (320,390,480,960):
+        # M76 (F14): the native queue editor also at 360 (390 was already measured).
+        for width in (320,360,390,480,960):
             for theme in ('light','dark'):
                 page.set_viewport_size({'width':width,'height':1100})
                 page.emulate_media(color_scheme=theme)
@@ -446,6 +452,20 @@ with sync_playwright() as pw:
     check('queue-returned-error-one-count',"() => {const c=window.__cards.downloads;return c._message.includes('1 Eintrag') && !c._message.includes('0 Import') && !c._message.includes('nicht importiert');}")
     check('queue-returned-error-no-duplicate',"() => {const r=document.querySelector('codex-arrcompact-dialog').shadowRoot;return r.querySelectorAll('.busch-notice[data-tone=error]').length===1 && r.querySelector('.busch-notice[data-tone=error]').innerText.includes('Import bereits übermittelt.') && !r.querySelector('.busch-notice[data-tone=error]').innerText.includes('/api/v3/manualimport');}")
     page.locator('codex-arrcompact-dialog').screenshot(path=str(output/'queue-dialog-error-960-dark.png'))
+    # M76 (F14): the returned import error also at the phone widths 360 and 390, light and dark: sheet in the viewport,
+    # no horizontal overflow, one error notice, Regel 1 on the visible sheet, contrast and touch. Regel 2 of this
+    # arrstack-dialog (same import controller as the check dialog) is measured by render.py at 360/390; the protection
+    # of the unsaved selection (Escape, back, scrim) is checked above.
+    for width in (360,390):
+        for theme in ('light','dark'):
+            ansicht(width, theme)
+            page.wait_for_timeout(150)
+            check(f'queue-dialog-error-fits-{width}-{theme}',"() => {const s=document.querySelector('codex-arrcompact-dialog').shadowRoot.querySelector('.sheet'),r=s.getBoundingClientRect();return r.left>=0 && r.right<=innerWidth+0.5 && r.top>=0 && r.bottom<=innerHeight+0.5 && s.scrollWidth<=s.clientWidth+1 && s.querySelectorAll('.busch-notice[data-tone=error]').length===1;}")
+            page.locator('codex-arrcompact-dialog').screenshot(path=str(output/f'queue-dialog-error-{width}-{theme}.png'))
+            if regeln:
+                dialog_regel1[f'queue-dialog-error-{width}-{theme}'] = regeln.messe_text(page, '.sheet')
+            messe_kt('queue-dialog-error', 'codex-arrcompact-dialog', width, theme)
+    ansicht(960, 'dark')
     page.evaluate('window.__importBackendError=false;window.__deferImport=true')
     page.locator('codex-arrcompact-dialog [data-akt=import]').click()
     page.wait_for_function('!!window.__resolveQueueImport')
@@ -490,9 +510,11 @@ if MISST_KT:
     for bereich in ('kontrast', 'touch'):
         benutzt = {a.get('selektor') for lauf in kontrast_touch[bereich]['laeufe'] for a in lauf.get('ausnahmen', [])}
         kontrast_touch[bereich]['ungenutzte_ausnahmen'] = [a['selektor'] for a in liste.get(bereich, []) if a['selektor'] not in benutzt]
-(output/'compact-report.json').write_text(json.dumps({'native_host':len(sys.argv)>3,'checks':reports,'captures':captures,'page_errors':errors,'blocked_http':blocked_http,'blocked_ws':blocked_ws,'unhandled_rejections':rejections,'ha_icon':ha_icon,'kontrast':kontrast_touch['kontrast'],'touch':kontrast_touch['touch']},indent=2,ensure_ascii=False))
+(output/'compact-report.json').write_text(json.dumps({'native_host':len(sys.argv)>3,'checks':reports,'captures':captures,'page_errors':errors,'blocked_http':blocked_http,'blocked_ws':blocked_ws,'unhandled_rejections':rejections,'ha_icon':ha_icon,'kontrast':kontrast_touch['kontrast'],'touch':kontrast_touch['touch'],'ui_regeln_dialog':dialog_regel1 if regeln else {'kein_urteil':'regeln.py nicht gefunden - Regel 1 im Dialog nicht gemessen'}},indent=2,ensure_ascii=False))
 print(json.dumps({'checks':len(reports),'all_passed':all(item['passed'] for item in reports),'page_errors':len(errors),'blocked_http':len(blocked_http),'blocked_ws':len(blocked_ws),'unhandled_rejections':len(rejections)}))
 assert not errors and not rejections
 assert len(sys.argv)>3 or not regeln or (ha_icon['aktiv'] and not ha_icon['fehlend']),ha_icon
 if MISST_KT and (not kontrast_touch['kontrast']['laeufe'] or regeln.bewerte(kontrast_touch)):
     sys.exit('M26: Kontrast/Touch-Verstoss oder nichts gemessen, siehe compact-report.json (kontrast/touch)')
+if regeln and regeln.bewerte(dialog_regel1):
+    sys.exit('M76: Regel-1-Verstoss im Dialog, siehe compact-report.json (ui_regeln_dialog)')

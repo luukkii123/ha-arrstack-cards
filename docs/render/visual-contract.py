@@ -37,6 +37,10 @@ record = "--record" in sys.argv[2:]
 baseline = pathlib.Path(__file__).parent / "baselines" / "ui-0.1.0"
 files = [f"alle-{width}-{theme}.png" for width in (320, 390, 480, 960) for theme in ("light", "dark")]
 files += [f"editoren-{width}-{theme}.png" for width in (320, 390, 480, 960) for theme in ("light", "dark")]
+# M76 (F14): the editors are also rendered and measured at 360 px (editoren-360-*.png); that picture has no reviewed
+# baseline yet and is not part of the pixel comparison until it is recorded (--record).
+EDITOR_KARTEN = ("arrstack-downloads-card", "arrstack-recent-card", "arrstack-fix-card", "arrstack-seer-card")
+AUSNAHMEN = pathlib.Path(__file__).resolve().with_name("kontrast-ausnahmen.json")
 
 
 TOLERANZ_KANAL = 8        # hoechstens 8/255 je Farbkanal gilt als gleich
@@ -294,7 +298,7 @@ try:
           }
         }""")
         page.wait_for_timeout(100)
-        for width in (320, 390, 480, 960):
+        for width in (320, 360, 390, 480, 960):
             for theme in ("light", "dark"):
                 page.set_viewport_size({"width": width, "height": 1200})
                 page.evaluate("theme => document.documentElement.dataset.theme=theme", theme)
@@ -344,6 +348,14 @@ try:
                     pageWidth:document.documentElement.scrollWidth,viewport:innerWidth};
                 }""")
                 checks[f"editors-{width}-{theme}"] = metrics
+                # M76 (F14): Regel 1 (regeln.messe_text) and, M26, contrast/touch in every editor panel at every width.
+                if regeln:
+                    for tag in EDITOR_KARTEN:
+                        messung = {"regel1": regeln.messe_text(page, f'.editor-panel[data-card="{tag}"]'),
+                                   **regeln.messe_kontrast_touch_hier(page, f'.editor-panel[data-card="{tag}"]', ausnahmen=AUSNAHMEN)}
+                        checks[f"editor-regeln-{tag}-{width}-{theme}"] = messung
+                        if regeln.bewerte(messung):
+                            findings.append(f"Editor {tag} {width}/{theme}: Regel 1/Kontrast/Touch {regeln.zaehle(messung)}")
                 if (metrics["pageWidth"] > width or not metrics["within"] or metrics["collides"]
                         or metrics["textOverflow"] or not metrics["helpers"]
                         or metrics["minimumHeight"] < 44 or metrics["outline"] == "none"

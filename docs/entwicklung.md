@@ -42,6 +42,11 @@ erfundenen Daten; weder Medien-Stack noch Schlüssel nötig. Die Titel sind
 absichtlich zu lang, um das Kürzen zu prüfen. Es misst Textüberlauf bei
 320/390/480/960 px, hell/dunkel, mit und ohne HA-Tokens sowie das Schließen
 der Dialoge (Escape, Zurück, Schließen, geschützter Außenklick).
+Die Dialoge (Prüfen, Löschen) misst es zusätzlich bei 360 px (Regel 1),
+bei allen Breiten auf Kontrast/Touch und Regel 2 auch bei 360/390 px; die
+Dialogbilder entstehen bei 360/390 px hell und dunkel. `visual-contract.py` misst die Editoren auch bei
+360 px mit Regel 1 und Kontrast/Touch, `compact-contract.py` den
+Importfehler-Dialog bei 360/390 px (M76).
 
 Hinweis: `render.py` bindet das Messmodul `regeln.py` ein, das nicht in diesem
 Repo liegt (es gehört zur Verwaltungsumgebung des Autors); ohne es läuft das

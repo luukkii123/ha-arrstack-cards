@@ -71,6 +71,9 @@ SERVE.mkdir(exist_ok=True)
 shutil.copy(JS, SERVE / "arrstack-cards.js")
 PORT = 8098
 
+# M76 (F14): phone widths at which every dialog is also rendered and measured (Regel 1, Regel 2, contrast/touch).
+HANDY_BREITEN = (360, 390)
+
 #: Die vier Karten, wie sie auf der Prüfseite liegen.
 KARTEN = {
     "downloads": "arrstack-downloads-card",
@@ -580,6 +583,25 @@ try:
             popup_selektor=".sheet",
             schliessen_knopf_selektor=".dlg-close", dialog_typ="bestaetigung")
 
+        # M76 (F14): Regel 2 also at the phone widths. Below 450 px the check sheet is compact and the
+        # confirmation is full screen; where no point beside the sheet exists, the scrim check is kein_urteil
+        # (ui-regeln.md, Regel 2, Prüfung 5). The other four checks need a verdict at every width.
+        for breite in HANDY_BREITEN:
+            page.set_viewport_size({"width": breite, "height": 1200})
+            page.wait_for_timeout(200)
+            for name, knopf, typ in (("fix_pruefen", ".act-check", "bearbeitung"),
+                                     ("fix_loeschen", ".act-delete", "bestaetigung")):
+                alles_zu(page)
+                popups[f"{name}_{breite}"] = regeln.messe_popup(
+                    page,
+                    oeffnen=lambda k=knopf: page.evaluate(
+                        "(k) => { const b = window.__cards.fix.shadowRoot.querySelector(k); if (b) b.click(); }", k),
+                    popup_selektor=".sheet",
+                    schliessen_knopf_selektor=".dlg-close", dialog_typ=typ)
+        alles_zu(page)
+        page.set_viewport_size({"width": 960, "height": 1200})
+        page.wait_for_timeout(200)
+
         # ── Regel 1 im Dialog ────────────────────────────────────────────────
         # Bezugsrechteck ist `.sheet`, das sichtbare Blatt — NICHT der Host
         # `arrstack-dialog`. Der ist `position: fixed; inset: 0` und damit so
@@ -618,9 +640,14 @@ try:
             auf(page)
             ui_dialog[name] = regeln.lauf_breiten(
                 page,
-                breiten=(320,390,480,960),
+                breiten=(320, 360, 390, 480, 960),
                 messung=lambda p: regeln.messe_text(p, ".sheet"),
                 vor_messung=auf)
+            # M26/M76: contrast and touch targets of the open dialog at the same widths, both themes.
+            ui_dialog[name].update(regeln.messe_kontrast_touch(
+                page, "arrstack-dialog",
+                ausnahmen=pathlib.Path(__file__).with_name("kontrast-ausnahmen.json"),
+                breiten=(320, 360, 390, 480, 960), vor_messung=auf))
             alles_zu(page)
         dialog_auf(page)
 
@@ -653,6 +680,26 @@ try:
         page.wait_for_timeout(300)
         page.screenshot(path=str(OUT / f"dialog-pruefen-{WIDTH}-light.png"))
         alles_zu(page)
+
+        # M76 (F14): the three dialog pictures also at the phone widths, light and dark.
+        for bild, knopf in (("dialog-import", ".act-check"), ("dialog-loeschen", ".act-delete"),
+                            ("dialog-pruefen", ".act-check")):
+            bereit = ".dlg-sub" if bild == "dialog-pruefen" else ".sheet"
+            for breite in HANDY_BREITEN:
+                for thema in ("light", "dark"):
+                    alles_zu(page)
+                    page.set_viewport_size({"width": breite, "height": 1200})
+                    page.evaluate("(t) => { document.documentElement.dataset.theme = t; }", thema)
+                    page.evaluate(
+                        "(k) => { const b = window.__cards.fix.shadowRoot.querySelector(k); if (b) b.click(); }", knopf)
+                    page.wait_for_function(
+                        "(s) => { const d = document.querySelector('arrstack-dialog');"
+                        "         return d && d.shadowRoot.querySelector(s); }", arg=bereit, timeout=10000)
+                    page.wait_for_timeout(300)
+                    page.screenshot(path=str(OUT / f"{bild}-{breite}-{thema}.png"))
+        alles_zu(page)
+        page.set_viewport_size({"width": WIDTH, "height": 1200})
+        page.evaluate("() => { document.documentElement.dataset.theme = 'light'; }")
 
         # ── Was regeln.py nicht misst, die Spec aber verlangt ────────────────
         # Scrim-Klick, Vollbildgrenze, Dialogbreite, z-index — und der
