@@ -31,3 +31,14 @@ test('M26 compact-contract keeps running without regeln.py: kontrast/touch are k
   const text = lies('compact-contract.py');
   assert.match(text, /kontrast_touch\s*=\s*\{bereich:\s*\{'kein_urteil'/, 'no kein_urteil for kontrast/touch without regeln.py');
 });
+
+// Run karten-20261124-120007 (37-compact-contract): in light theme the secondary texts (.row-meta, .queue-label,
+// queue summary) stood at #727272 on the page background #f2f4f7 (4.3:1), because compact-contract.py defined ha-card
+// as a bare element without the card surface. The synthetic page uses render.py's ha-card stand-in (shadow root
+// painting --card-background-color, as the real ha-card), so the measurement compares text with the card surface.
+test('M26 compact-contract uses the ha-card stand-in of render.py that paints the card surface', () => {
+  const text = lies('compact-contract.py');
+  assert.doesNotMatch(text, /customElements\.define\('ha-card',\s*class extends HTMLElement\s*\{\s*\}\)/, 'bare ha-card without surface');
+  assert.match(text, /html\.index\('class HaCard'\)/, 'ha-card stand-in not taken from render.py PAGE');
+  assert.match(lies('render.py'), /class HaCard extends HTMLElement[\s\S]*?background: var\(--ha-card-background, var\(--card-background-color, #fff\)\)/);
+});

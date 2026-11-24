@@ -121,7 +121,11 @@ with sync_playwright() as pw:
         if regeln: regeln.ha_icon_attrappe(page)  # M79: real MDI glyphs (synthetic page only; native HA keeps its own ha-icon)
         page.set_content(html[:html.index('<script>')].replace('MAXWIDTH','928').replace('<div id="wrap"></div>','<div id="compact-test"></div>'))
         page.evaluate("window.__mount=document.getElementById('compact-test')")
-        page.evaluate("customElements.define('ha-card',class extends HTMLElement{});customElements.define('ha-form',class extends HTMLElement{})")
+        # Run karten-20261124-120007: a bare ha-card left the cards on the page background (#f2f4f7) and the contrast
+        # measurement compared text with the wrong surface. render.py's stand-in paints the card surface in its shadow
+        # root like the real ha-card; taken from its PAGE so both scripts share one definition.
+        page.add_script_tag(content=html[html.index('class HaCard'):html.index("customElements.define('ha-card', HaCard);")]+"customElements.define('ha-card', HaCard);")
+        page.evaluate("customElements.define('ha-form',class extends HTMLElement{})")
     page.add_script_tag(content=source)
     page.add_script_tag(content=fixture)
     page.evaluate('''() => {window.__cards={};for(const kind of ['seer','fix','downloads']){
