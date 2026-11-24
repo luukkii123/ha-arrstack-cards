@@ -380,7 +380,7 @@ const BuschUI = (() => {
  *  - Rule 4: colours, spacing and font sizes only through theme variables.
  */
 
-const CARD_VERSION = "0.10.0";
+const CARD_VERSION = "0.10.1";
 
 const DOCS_URL = "https://github.com/luukkii123/ha-arrstack-cards";
 
