@@ -38,7 +38,9 @@ Die Datei wird über einen **eigenen HTTP-Server** ausgeliefert statt per
 404 — und nur so lässt sich belegen, dass keiner stattfindet. Jede Netzanfrage
 landet in `report.json`.
 
-`ha-card`, `ha-icon` und `ha-form` werden durch schlanke Attrappen ersetzt,
+`ha-card`, `ha-icon` und `ha-form` werden durch schlanke Attrappen ersetzt
+(`ha-icon` ist die gemeinsame Attrappe `regeln.ha_icon_attrappe` mit den echten
+MDI-Glyphen; die Kontrastmessung prüft sie mit 3:1, M79),
 `hass.callWS` beantwortet die `arrstack/*`-Kommandos mit erfundenen Daten —
 es wird kein Media-Stack gebraucht und kein Schlüssel. Die Attrappen-Titel
 sind absichtlich zu lang: gekürzt werden muss genau dort.
@@ -164,6 +166,8 @@ PAGE = """<!doctype html>
     }
   }
   customElements.define('ha-card', HaCard);
+  /* Fallback only: the shared ha-icon stand-in (regeln.ha_icon_attrappe, M79) is installed before this page loads
+     and ignores this define, so the cards show the real MDI glyphs. */
   class HaIcon extends HTMLElement {
     connectedCallback() { this.style.display = 'inline-block';
       this.style.width = '24px'; this.style.height = '24px'; }
@@ -340,6 +344,7 @@ def alles_zu(page):
 try:
     with sync_playwright() as pw:
         browser = pw.chromium.launch(args=["--no-sandbox"])
+        regeln.ha_icon_attrappe(browser)  # M79: shared ha-icon with the real MDI glyphs (hacs/docs/render/mdi-pfade.json)
         page = browser.new_page(
             viewport={"width": WIDTH, "height": 1200},
             device_scale_factor=1,
@@ -826,6 +831,7 @@ try:
                 return out;
             }"""
         )
+        ha_icon = regeln.ha_icon_fehlend(page)  # M79: stand-in active, names without a path
         browser.close()
 finally:
     server.terminate()
@@ -854,6 +860,7 @@ report = {
     "eigene_pruefungen": eigen,
     "zeilenraster": zeilenraster,
     "suchfeld_x": suchfeld_x,
+    "ha_icon": ha_icon,
 }
 (OUT / "report.json").write_text(
     json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8"
@@ -937,6 +944,9 @@ for breite, befund in suchfeld_x.items():
         schlecht = 1
 if not suchfeld_x:
     print("FEHLER: Seerr-Suchfeld, X nicht gemessen.")
+    schlecht = 1
+if not ha_icon.get("aktiv") or ha_icon.get("fehlend"):
+    print("FEHLER: M79 ha-icon-Attrappe nicht aktiv oder Symbole ohne Pfad: %s" % ha_icon)
     schlecht = 1
 if report["page_errors"] or report["console_errors"]:
     print("FEHLER: Die Seite hat Fehler protokolliert.")

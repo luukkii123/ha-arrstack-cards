@@ -17,6 +17,20 @@ import threading
 
 from playwright.sync_api import sync_playwright
 
+# M79: shared ha-icon stand-in with the real MDI glyphs from hacs/docs/render/regeln.py (/work in the runner
+# container), the same as render.py, so the baselines show real symbols. Without regeln.py (no /work) the page keeps
+# render.py's simple ha-icon and only the stand-in check is skipped (ha_icon.kein_urteil); in the runner it is mandatory.
+sys.path.insert(0, "/work")
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+try:
+    import regeln  # noqa: E402
+except ImportError:
+    if pathlib.Path("/work").exists():
+        sys.exit('regeln.py nicht gefunden: der Container braucht -v "<hacs>/docs/render:/work" (hacs/docs/karten.md).')
+    regeln = None
+    print("ha-icon-Attrappe: NICHT geprueft - regeln.py fehlt (ohne /work)")
+KEIN_URTEIL = {"kein_urteil": "regeln.py nicht gefunden - ha-icon-Attrappe nicht geprueft"}
+
 
 out = pathlib.Path(sys.argv[1]).resolve()
 record = "--record" in sys.argv[2:]
@@ -71,6 +85,8 @@ checks = {}
 try:
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch(args=["--no-sandbox"])
+        if regeln:
+            regeln.ha_icon_attrappe(browser)  # M79: real MDI glyphs, as in render.py
         page = browser.new_page(viewport={"width": 320, "height": 1200}, device_scale_factor=1, locale="de-DE")
         page.goto(f"http://127.0.0.1:{server.server_port}/page.html", wait_until="load")
         page.wait_for_function("window.__cards?.downloads?.shadowRoot?.querySelector('.queue-table')")
@@ -344,6 +360,9 @@ try:
                     findings.append(f"Editoren {width}/{theme}: {metrics['blankSelects']} Auswahl(en) ohne Platzhalter")
                 if not metrics["orderState"]:
                     findings.append(f"Editoren {width}/{theme}: Spaltenreihenfolge ohne erklaerten Zustand")
+        checks["ha_icon"] = regeln.ha_icon_fehlend(page) if regeln else KEIN_URTEIL  # M79: active, names without a path
+        if regeln and (not checks["ha_icon"]["aktiv"] or checks["ha_icon"]["fehlend"]):
+            findings.append(f"M79 ha-icon-Attrappe nicht aktiv oder Symbole ohne Pfad: {checks['ha_icon']}")
         browser.close()
 finally:
     server.shutdown()

@@ -13,6 +13,20 @@ import sys
 import threading
 from playwright.sync_api import sync_playwright
 
+# M79: shared ha-icon stand-in with the real MDI glyphs from hacs/docs/render/regeln.py (/work in the runner container).
+# M45: the repo CI job `contracts` (.github/ci-contracts.txt) has no regeln.py. Without it the synthetic page keeps no
+# ha-icon of its own and only the stand-in check is skipped (ha_icon.kein_urteil); where /work exists it is mandatory.
+sys.path.insert(0, '/work')
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+try:
+    import regeln  # noqa: E402
+except ImportError:
+    if Path('/work').exists():
+        sys.exit('regeln.py nicht gefunden: der Container braucht -v "<hacs>/docs/render:/work" (hacs/docs/karten.md).')
+    regeln = None
+    print('ha-icon-Attrappe: NICHT geprueft - regeln.py fehlt (Repo-CI ohne /work)')
+KEIN_URTEIL = {'kein_urteil': 'regeln.py nicht gefunden - ha-icon-Attrappe nicht geprueft'}
+
 bundle, output = Path(sys.argv[1]), Path(sys.argv[2])
 output.mkdir(parents=True, exist_ok=True)
 script = Path(__file__).with_name('render.py').read_text()
@@ -91,6 +105,7 @@ with sync_playwright() as pw:
           main.style.cssText='position:fixed;inset:0;z-index:9999;overflow:auto;padding:16px;background:var(--primary-background-color);box-sizing:border-box';
           ha.shadowRoot.appendChild(main);window.__mount=main;}''')
     else:
+        if regeln: regeln.ha_icon_attrappe(page)  # M79: real MDI glyphs (synthetic page only; native HA keeps its own ha-icon)
         page.set_content(html[:html.index('<script>')].replace('MAXWIDTH','928').replace('<div id="wrap"></div>','<div id="compact-test"></div>'))
         page.evaluate("window.__mount=document.getElementById('compact-test')")
         page.evaluate("customElements.define('ha-card',class extends HTMLElement{});customElements.define('ha-form',class extends HTMLElement{})")
@@ -445,7 +460,9 @@ with sync_playwright() as pw:
     check('tmdb-namespace-focus-return',"() => window.__cards.seer.shadowRoot.activeElement?.dataset.index===String(window.__cards.seer._results.length-1)")
     blocked_ws=page.evaluate("window.__blockedWrites || []")
     rejections=page.evaluate("window.__rejections || []")
+    ha_icon=(regeln.ha_icon_fehlend(page) if regeln else KEIN_URTEIL) if len(sys.argv)<=3 else None  # M79: active, names without a path
     browser.close()
-(output/'compact-report.json').write_text(json.dumps({'native_host':len(sys.argv)>3,'checks':reports,'captures':captures,'page_errors':errors,'blocked_http':blocked_http,'blocked_ws':blocked_ws,'unhandled_rejections':rejections},indent=2,ensure_ascii=False))
+(output/'compact-report.json').write_text(json.dumps({'native_host':len(sys.argv)>3,'checks':reports,'captures':captures,'page_errors':errors,'blocked_http':blocked_http,'blocked_ws':blocked_ws,'unhandled_rejections':rejections,'ha_icon':ha_icon},indent=2,ensure_ascii=False))
 print(json.dumps({'checks':len(reports),'all_passed':all(item['passed'] for item in reports),'page_errors':len(errors),'blocked_http':len(blocked_http),'blocked_ws':len(blocked_ws),'unhandled_rejections':len(rejections)}))
 assert not errors and not rejections
+assert len(sys.argv)>3 or not regeln or (ha_icon['aktiv'] and not ha_icon['fehlend']),ha_icon

@@ -45,7 +45,13 @@ der Dialoge (Escape, Zurück, Schließen, geschützter Außenklick).
 
 Hinweis: `render.py` bindet das Messmodul `regeln.py` ein, das nicht in diesem
 Repo liegt (es gehört zur Verwaltungsumgebung des Autors); ohne es läuft das
-Skript nicht.
+Skript nicht. `ha-icon` kommt dort als gemeinsame Attrappe
+(`regeln.ha_icon_attrappe`, echte MDI-Glyphen aus `mdi-pfade.json` neben
+`regeln.py`); die Kontrastmessung prüft die Symbole mit 3:1 (M79), und
+`report.json` meldet unter `ha_icon`, ob die Attrappe aktiv war und welche
+Namen ohne Pfad blieben. `visual-contract.py` und `compact-contract.py` nutzen
+dieselbe Attrappe; ohne `regeln.py` (Repo-CI) entfällt nur diese Prüfung
+(`kein_urteil`). `tests/render-ha-icon.test.js` sichert das im Quelltext.
 
 ```bash
 docker run --rm \
