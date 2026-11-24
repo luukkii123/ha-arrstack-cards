@@ -94,6 +94,8 @@ stammt.
 
 ## Geprüft
 
+**24.11.2026 · main (kein Release, Bundle unverändert), Nachholetappe J2 (#1347)** — Kontrast/Touch im compact-contract auf der Kartenfläche (M26), Dialoge/Editoren bei 360/390 (M76). Abschlusslauf `karten-20261124-124054-53d328` 58/58 grün, Bildprüfung ok, Beleg gleich.
+
 **24.11.2026 · 0.10.1, Nachholetappe J (#1330, Tag `v0.10.1`)** — echte MDI-Symbole in den Renderskripten (M79), Abstand Symbol→Titel 12 px (M61); Baselines nach Sichtprüfung neu. Abschlusslauf `karten-20261124-104659-fea696` grün (58/58, Volllauf, 2752 Node-Tests), `--beleg-pruefen` gleich; Bilder am Bild geprüft (Sonnet).
 
 **20.11.2026 · 0.10.0, Buschcheck Etappe I (#1324, Tag `v0.10.0`)** — Kopfkommentar mit Test (M73), Seer-X ≥ 3:1, gewählte Staffel mit Rahmen, Fokus-Token, Shared UI 0.5.3, CI aus der Vorlage (M45). 174 Node-Tests; Baselines nach Sichtprüfung neu. Abschlusslauf `karten-20261119-234243-239269` grün (57/57, Volllauf, 2700 Node-Tests, Block `statisch` grün inkl. CI-Vorlage und Zeilenlänge), `--beleg-pruefen` gleich; Bilder am Bild geprüft (Sonnet).
