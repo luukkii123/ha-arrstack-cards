@@ -224,6 +224,15 @@ test("M61: the family sets no own title type; the title may wrap to two lines (E
   assert.match(clamp, /overflow-wrap:\s*anywhere/);
 });
 
+test("M61 position (#1331): symbol 44 px, then --ha-space-3 to the title like Lightcards and Unraid", () => {
+  assert.match(OWN, /--arr-media:\s*44px;/, "symbol tile 44 px");
+  const lead = (OWN.match(/\.head-title\s*\{([^}]*)\}/) || [])[1] || "";
+  assert.match(lead, /gap:\s*var\(--arr-space-3\);/, "gap symbol -> title 12 px");
+  // Narrow card: status and actions start under the title, so they move with the gap.
+  const side = (OWN.match(/\.head-side\s*\{\s*grid-column:\s*1;([^}]*)\}/) || [])[1] || "";
+  assert.match(side, /margin-inline-start:\s*calc\(var\(--arr-media\) \+ var\(--arr-space-3\)\);/);
+});
+
 /* ── M28: one dialog anatomy, history and focus logic from Shared UI ───── */
 
 /** A history stand-in: an entry stack, back() pops and fires popstate like the browser. */

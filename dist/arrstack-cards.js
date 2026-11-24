@@ -1120,10 +1120,11 @@ const ARRSTACK_GEMEINSAM = `
     gap: var(--arr-space-3);
     margin-bottom: var(--arr-space-4);
   }
+  /* M61 (#1331): symbol 44 px, then 12 px to the title like Lightcards and Unraid. */
   .head-title {
     display: flex;
     align-items: center;
-    gap: var(--arr-space-2);
+    gap: var(--arr-space-3);
     min-width: 0;
     flex: 1 1 auto;
   }
@@ -1306,7 +1307,7 @@ const ARRSTACK_STYLES = BuschUI.cardStyles + ARRSTACK_TOKENS + ARRSTACK_EINZEILI
   /* Status und Aktionen stehen unter dem Titel, sobald die Karte eng wird. */
   @container (max-width: 440px) {
     .head { grid-template-columns: minmax(0, 1fr); gap: var(--arr-space-2); }
-    .head-side { grid-column: 1; justify-self: start; margin-inline-start: calc(var(--arr-media) + var(--arr-space-2)); }
+    .head-side { grid-column: 1; justify-self: start; margin-inline-start: calc(var(--arr-media) + var(--arr-space-3)); }
     .actions { flex: 1 1 100%; width: 100%; }
   }
 `;
